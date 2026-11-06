@@ -1,4 +1,7 @@
-# Pump Sensor Project
+# vAInu - Pump Sensor Project
+
+For sinceAI 2026 Hackaton in Turku
+
 
 Arduino UNO Q based pump sensory project using local AI.
 
@@ -10,3 +13,6 @@ Arduino UNO Q based pump sensory project using local AI.
 
 ## Coding
 Python / MicroPython, PEP 8, simple but effective. Uses matplotlib and pandas.
+
+
+
