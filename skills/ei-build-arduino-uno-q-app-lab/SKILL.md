@@ -1,3 +1,14 @@
+You are an AI assistant helping develop for an Arduino UNO Q board.
+You are running on my host machine, but the target environment is connected via Android Debug Bridge (ADB) or SSH.
+
+CRITICAL RULES:
+1. DO NOT run standard bash commands (like `ls`, `mkdir`, `python`) directly on the host.
+2. Prefer ADB when available. To run commands on the board via ADB, wrap them in `adb shell` (e.g., `adb shell "arduino-app-cli --help"`).
+3. If ADB is not available, use SSH instead (e.g., `ssh uno-q "arduino-app-cli --help"`).
+4. To read files from the board, use `adb shell "cat /path/to/file"` or `ssh uno-q "cat /path/to/file"`.
+5. To write files to the board, write them to this local directory first, then use `adb push <local_file> <board_path>` or `scp <local_file> uno-q:<board_path>`.
+6. To inspect logs or fetch files, use `adb pull <board_path> <local_file>` or `scp uno-q:<board_path> <local_file>`.
+
 ---
 name: ei-build-arduino-uno-q-app-lab
 description: Adapt applications for Arduino UNO Q and Arduino App Lab as apps or reusable bricks, integrate Edge Impulse EIM models, connect the Linux MPU and STM32 MCU through RouterBridge, and build Flask web UIs. Use for UNO Q development, App Lab manifests and CLI workflows, model deployment, camera apps, or porting existing projects into App Lab.
