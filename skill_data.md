@@ -20,3 +20,7 @@ When working with this data:
 - Test labels are not public; do not leak.
 - Use data_dictionary.csv as the source of truth for columns/units.
 - Baseline predictions exist for comparison; submission format in submission_template.
+
+## Local models (this machine)
+
+- Chain: smollm2:135m (sub-task) -> mistral (mid) -> gemma4:e2b (main), via `python3 ~/chain_models.py <mode> "<text>"` (modes: code, data, analysis). Run with `.venv/bin/python` for data libs.

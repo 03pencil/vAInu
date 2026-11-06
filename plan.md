@@ -1,9 +1,11 @@
 # Project Plan
 
 ## Goal
+
 Build an Arduino UNO Q app that reads pump sensory data and runs local AI to detect anomalies/faults.
 
 ## Steps
+
 1. Explore data: load starter telemetry with pandas, inspect channels, asset tiers.
 2. Baseline analysis: compute simple stats, plots (matplotlib) per asset/channel.
 3. Feature engineering: rolling stats, vibration trends, pressure/flow ratios.
@@ -12,6 +14,7 @@ Build an Arduino UNO Q app that reads pump sensory data and runs local AI to det
 6. Test on hardware; iterate.
 
 ## Milestones
+
 - M1: Data exploration notebook/script done.
 - M2: Baseline model metrics on validation.
 - M3: App Lab app running on UNO Q.
