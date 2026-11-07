@@ -38,6 +38,11 @@ z_threshold = 3.0
 # matching how the benchmark defines detectability).
 smoothing_window = 60
 
+[compute]
+# Worker processes for the per-asset math (the rolling z surface dominates
+# the build). 0 = auto: every logical CPU but one. Set 1 for the serial path.
+workers = 0
+
 [trend]
 # Layer 1 item 3: trailing-drift extrapolation -> time-to-limit.
 # Forecasts run on short-interval RUNNING-row medians (bin_minutes),
@@ -73,6 +78,21 @@ host = "127.0.0.1"
 port = 8000
 # Browser polling interval (seconds) and samples returned per chart window.
 refresh_seconds = 2
+history_samples = 600
+# Chart-window choices in seconds; the UI converts them to samples using the
+# telemetry grid (1 s on the full tier, 10 s on the starter tier).
+window_intervals = [10, 60, 600, 1800, 3600]
+# |z| >= z_threshold * watch_fraction is shown as WATCH (below ALARM).
+watch_fraction = 0.5
+# Severity gauge shown in the UI: 0 = no deviation, alarm_mark = the z
+# threshold, 100 = 3x the threshold (and anything above).
+alarm_mark = 80
+# Preferred chart channel; when it has no reading, the channel that best
+# explains the current status is shown instead.
+default_channel = "vibration_rms_mm_s"
+# Finished alarm surface kept on disk so a restart skips the rebuild.
+# Relative paths resolve from the repository root; "" disables the cache.
+cache_dir = "cache/web_ui"
 history_samples = 240
 # |z| >= z_threshold * watch_fraction is shown as WATCH (below ALARM).
 watch_fraction = 0.5

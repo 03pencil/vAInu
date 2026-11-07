@@ -36,6 +36,46 @@ python3 -m venv .venv
 # Replay the starter data through the pilot monitor
 .venv/bin/python scripts/pilot_run.py --data data/starter --speed 0
 
+## Web UI (first version)
+
+A dependency-free local dashboard shows the current alarm surface over the
+bundled telemetry:
+
+```bash
+python scripts/web_ui.py --data data/full
+```
+
+Open <http://127.0.0.1:8000>. Use `--host 0.0.0.0` to expose it on the local
+network (the prototype has no authentication, so trusted LANs only).
+
+The first version includes:
+
+- asset list with `OK` / `WATCH` / `ALARM` / `IDLE` status,
+- an alarm severity score from 0 to 100 (the z threshold lands at 80),
+- latest values and robust modified z-scores per channel,
+- top deviating channels at the selected sample,
+- a channel chart with alarm bands, window selector, and replay controls.
+
+The first build scores every asset in parallel processes (one per logical CPU
+by default) and writes the finished alarm surface to `cache/web_ui`, so a
+restart skips the rebuild:
+
+```bash
+python scripts/web_ui.py --data data/full --workers 8    # cap the process count
+python scripts/web_ui.py --data data/full --rebuild      # ignore the cache
+python scripts/web_ui.py --data data/full --cache-dir "" # disable the cache
+```
+
+`[compute] workers` in `config.toml` sets the default (`0` = auto), and
+`[web_ui] cache_dir` sets where the surface is stored.
+
+> The full tier needs its telemetry parquet partitions
+> (`data/full/telemetry/`), which are excluded by `.gitignore`. If they are
+> missing from the checkout, point `--data` at the original participant
+> bundle. The dashboard uses the same robust
+> envelope math as `scripts/sanity_gate.py`; SmolLM narration is not wired yet.
+
+## Tech Stack
 # Start the dashboard, then open http://127.0.0.1:8000
 .venv/bin/python scripts/web_ui.py --data data/starter
 ```

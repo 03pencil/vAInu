@@ -21,6 +21,11 @@ Thumbs.db
 # Folders
 
 
+# Pilot output (state.json, predictions.jsonl)
+/pilot/
+
+# Rebuild cache (finished alarm surface)
+/cache/
 
 # Pilot output (state.json, predictions.jsonl)
 /pilot/
