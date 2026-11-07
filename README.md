@@ -85,6 +85,6 @@ Project code is MIT, see [`LICENSE`](LICENSE). The original dataset is © Since 
 
 ## Acknowledgements
 
-Thanks to **Majos Hacking League** for providing the Arduino UNO Q.
+Thanks to **Major Hacking League** for providing the Arduino UNO Q.
 
 Development used [OpenCode](https://opencode.ai) with Claude Haiku 5.5.
