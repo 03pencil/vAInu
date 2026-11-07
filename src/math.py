@@ -9,7 +9,9 @@ import pandas as pd
 
 
 def basic_stats(df: pd.DataFrame) -> pd.DataFrame:
-    """Return per-channel descriptive statistics."""
+    """Return per-channel descriptive statistics (empty-safe)."""
+    if df.empty:
+        return pd.DataFrame()
     return df.describe()
 
 

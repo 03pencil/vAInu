@@ -4,6 +4,12 @@
 - Target hardware: Arduino UNO Q (Linux MPU + STM32 MCU) running Arduino App Lab, with local AI on-device.
 - Data source: only the `data/` folder (full + starter tiers) — fictional pump telemetry dataset; this is what we build on.
 
+## Data is read-only (hard rule)
+- Treat everything under `data/` as immutable source material.
+- Do NOT modify, overwrite, regenerate, rename, move, or delete any file there.
+- Do NOT write analysis results, features, or plots back into `data/`.
+- Consume the data exactly as shipped; if something looks wrong, report it.
+
 ## Coding style
 - Language: Python (and MicroPython where MCU-side).
 - Follow generic Python best practices (PEP 8): clear names, small functions, type hints where helpful, docstrings, no clever one-liners.

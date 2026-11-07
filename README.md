@@ -31,10 +31,17 @@ See [`plan.md`](plan.md) for the full architecture and roadmap, and [`to-do.md`]
 
 ## Repository Structure
 
-- `data/` — pump telemetry dataset (full + starter tiers). Treat as the only data source.
-- `skills/` — installed agent skills (ei-build-arduino-uno-q-app-lab) + project skill notes.
-- `tests/` — tests.
-- `skill_data.md` — instructions about the data and coding style.
+- `config.toml` — all project settings (paths, tiers, assets, channels, analysis).
+- `main.py` — entry point; orchestrates the modules in `src/`.
+- `src/` — library code:
+  - `data_input.py` — load and split telemetry.
+  - `math.py` — statistics / algorithmic helpers.
+  - `ui.py` — matplotlib plotting helpers.
+  - `config.py` — reads `config.toml`.
+- `data/` — pump telemetry dataset (`full/` + `starter/`). **Read-only**; the only data source.
+- `skills/` — coding and data guidelines for humans and LLMs.
+- `skill_data.md` — notes about the dataset and its handling.
+- `plan.md` / `to-do.md` — roadmap and task breakdown.
 
 ## Tech Stack
 

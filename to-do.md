@@ -1,12 +1,16 @@
 # To-Do
 
+> **Rule:** `data/` is read-only. Never edit, overwrite, regenerate, or delete
+> anything inside it. See `skills/python-style.md` and `skill_data.md`.
+
 ## M1: Data exploration
 - [ ] Develop .py files (data_input, math, ui, main) into working implementations.
 - [ ] Set up Python environment / install pandas, matplotlib.
-- [ ] Load starter telemetry into a DataFrame.
+- [ ] Load telemetry from the configured tier (full/starter) into a DataFrame.
 - [ ] Inspect channel names and data types.
 - [ ] Inspect asset tiers and counts.
-- [ ] Save exploration notebook/script.
+- [ ] Save exploration notebook/script (outside `data/`).
+- [ ] Confirm all settings come from `config.toml` — no hard-coding.
 
 ## M2: Baseline analysis
 - [ ] Compute basic stats (mean, std, min, max) per asset/channel.

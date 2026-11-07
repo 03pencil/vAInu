@@ -23,6 +23,12 @@ def load_telemetry(path: str | None = None) -> pd.DataFrame:
 
 
 def split_channels(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
-    """Split a telemetry frame into per-channel frames using configured channels."""
+    """Split a telemetry frame into per-channel frames.
+
+    If `df` has a `channel` column, each entry is filtered to that channel.
+    Otherwise the same frame is returned for every configured channel.
+    """
     channels = get_channels()
-    return {c: df[df.get("channel") == c] if "channel" in df else df for c in channels}
+    if "channel" in df.columns:
+        return {c: df[df["channel"] == c] for c in channels}
+    return {c: df for c in channels}

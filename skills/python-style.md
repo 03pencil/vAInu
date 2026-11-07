@@ -3,6 +3,13 @@
 Use these rules when writing or editing Python in this project.
 Goals: readable, scalable, no hard-coding, minimal features, unified style.
 
+## Data immutability (non-negotiable)
+- `data/` is read-only. Never edit, overwrite, regenerate, move, or delete
+  anything inside it. Load it, never write to it.
+- Derived outputs go elsewhere (in memory or a separate output directory),
+  never back into `data/`.
+- If the data looks wrong, report it; do not "fix" it in place.
+
 ## General
 - Prefer clarity over cleverness. Code must be readable by humans.
 - No extra features: implement only what is needed. Avoid speculative abstractions.
@@ -14,6 +21,18 @@ Goals: readable, scalable, no hard-coding, minimal features, unified style.
 - One responsibility per module: `data_input.py`, `math.py`, `ui.py`, `main.py`.
 - `main.py` orchestrates; modules do the work.
 - Keep public functions at module top level; private helpers prefixed with `_`.
+- All settings live in `config.toml`, read through `src/config.py`.
+  Never hard-code paths, asset IDs, channel names, or tunables.
+
+## Directory layout
+```
+config.toml      # single source of settings
+main.py          # entry point / orchestration
+src/             # library code (data_input, math, ui, config)
+data/            # READ-ONLY datasets (full/, starter/)
+skills/          # coding + data guidelines for humans and LLMs
+tests/           # tests
+```
 
 ## Naming
 - snake_case for functions/variables, PascalCase for classes, UPPER_SNAKE for constants.
