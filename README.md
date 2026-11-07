@@ -1,4 +1,4 @@
-# 🏭 vAInu — Pump Sensor Project
+# vAInu — Pump Sensor Project
 
 > Edge AI for predictive pump maintenance, running on an Arduino UNO Q.
 
