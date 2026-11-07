@@ -13,7 +13,8 @@ import argparse
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 
 from src.config import get_data_dir, get_web_ui_config  # noqa: E402
 from src.web_ui import DashboardData, serve  # noqa: E402
@@ -28,6 +29,10 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--host", default=None, help="Bind address (default from config).")
     parser.add_argument("--port", type=int, default=None, help="Port (default from config).")
+    parser.add_argument(
+        "--pilot-state", default=str(ROOT / "pilot" / "state.json"),
+        help="Pilot snapshot written by scripts/pilot_run.py (shown in the pilot panel).",
+    )
     parser.add_argument("--verbose", action="store_true", help="Log every HTTP request.")
     return parser.parse_args()
 
@@ -62,6 +67,7 @@ def main() -> None:
         refresh_seconds=web_config["refresh_seconds"],
         history_samples=web_config["history_samples"],
         verbose=args.verbose,
+        pilot_state_path=Path(args.pilot_state),
     )
 
 
