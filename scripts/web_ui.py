@@ -93,7 +93,6 @@ def main() -> None:
         f"in {data.build_seconds:.1f}s ({source}).",
         flush=True,
     )
-    print(f"Loaded {len(data.asset_ids)} assets and {len(data.channels)} channels.", flush=True)
     serve(
         data,
         host=host,

@@ -20,7 +20,7 @@ _WEB_UI_DEFAULTS = {
     "default_channel": "vibration_rms_mm_s",
     "alarm_mark": 80.0,
     "cache_dir": "cache/web_ui",
-    "history_samples": 240,
+    "history_samples": 600,
     "watch_fraction": 0.5,
     "default_channel": "vibration_rms_mm_s",
 }
