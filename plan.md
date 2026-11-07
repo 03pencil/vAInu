@@ -124,9 +124,10 @@ second surface) is implemented and KPI-gated; layer 1 items 2-4, layer 2,
 layer 3 and the feedback loop are pending — track them in
 [`to-do.md`](to-do.md).
 
-Stack rule: pure numpy/scipy/pandas (no sklearn). LLMs already available
-locally via `python3 ~/chain_models.py <mode> "<text>"` (ollama:
-smollm2:135m -> mistral -> gemma4:e2b).
+Stack rule: pure numpy/scipy/pandas (no sklearn). The only LLM is SmolLM
+(`smollm2:1.7b`) via Ollama, on the host for development and on the UNO Q for
+the board test. The earlier host chain (smollm2 -> mistral -> gemma4) is
+retired.
 
 ### Layer 1 - predictive math (deterministic)
 
@@ -162,14 +163,16 @@ smollm2:135m -> mistral -> gemma4:e2b).
 - Horizons: 10-min (fast anomalies), 1 h (trends), days (RUL-style).
 - State machine debouncing (ringing -> confirmed -> escalating).
 
-### Layer 3 - SmolLM chain (reasoning + narration)
+### Layer 3 - SmolLM narration (single model)
 
-- Python summarizes windows into a fixed ~200-token report.
-- chain_models.py analysis mode -> structured JSON verdict:
-  {fault_suspected, evidence, recommended_action, urgency, confidence},
-  constrained to the fault taxonomy from events_train.csv.
-- Fuses free-text `maintenance.csv operator_observation` (may be wrong -
-  demo of LLM judgment vs rule engine).
+- The pilot's deterministic record (status, evidence, z-scores) is turned into
+  a fixed-format situation report by Python.
+- `scripts/narrate.py` (separate process) sends one SmolLM call per alarm
+  episode and writes a plain-language explanation to `pilot/analysis.jsonl`.
+  The output is shown in its own dashboard panel and never changes status.
+- Later: a constrained fault-type choice from events_train.csv (measured
+  before use), and fusion of free-text `maintenance.csv operator_observation`
+  (may be wrong, a demo of LLM judgment vs rule engine).
 
 ### Improving over time (feedback loop)
 

@@ -287,9 +287,8 @@ ollama pull smollm2:1.7b
 - ~1.8 GB download. Use `ollama pull` for setup: it is non-interactive and safe
   over SSH. `ollama run <tag>` also pulls, but then opens a chat prompt; test it
   with e.g. `why do pumps fail?` and quit with `/bye`.
-- **Model choice to settle before the board test:** `plan.md` and
-  `skill_data.md` name `smollm2:135m` for the host chain. This section installs
-  `smollm2:1.7b`. Pick one tag for the UNO Q and use it everywhere.
+- **Model:** `smollm2:1.7b` is the only model used on the UNO Q (decided
+  2026-11-07).
 
 **Smaller variants** (all one tag swap, same command pattern `ollama run <tag>`):
 

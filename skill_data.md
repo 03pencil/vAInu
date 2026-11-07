@@ -29,4 +29,4 @@ When working with this data:
 
 ## Local models (this machine)
 
-- Chain: smollm2:135m (sub-task) -> mistral (mid) -> gemma4:e2b (main), via `python3 ~/chain_models.py <mode> "<text>"` (modes: code, data, analysis). Run with `.venv/bin/python` for data libs.
+- Model: smollm2:1.7b via Ollama (the only LLM in the plan; mistral and gemma4 were removed). Run with `.venv/bin/python` for data libs.
