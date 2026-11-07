@@ -56,7 +56,7 @@ A dependency-free local dashboard shows the current alarm surface over the
 bundled telemetry:
 
 ```bash
-python scripts/web_ui.py --data data/starter
+python scripts/web_ui.py --data data/full
 ```
 
 Open <http://127.0.0.1:8000>. Use `--host 0.0.0.0` to expose it on the local
@@ -69,9 +69,10 @@ The first version includes:
 - top deviating channels at the selected sample,
 - a channel chart with alarm bands, window selector, and replay controls.
 
-> If `data/starter/telemetry.csv.gz` is missing from the checkout (it is
-> excluded by `.gitignore`), point `--data` at the original participant
-> bundle or provision the file first. The dashboard uses the same robust
+> The full tier needs its telemetry parquet partitions
+> (`data/full/telemetry/`), which are excluded by `.gitignore`. If they are
+> missing from the checkout, point `--data` at the original participant
+> bundle. The dashboard uses the same robust
 > envelope math as `scripts/sanity_gate.py`; SmolLM narration is not wired yet.
 
 ## Tech Stack

@@ -2,10 +2,10 @@
 
 Usage:
     python scripts/web_ui.py
-    python scripts/web_ui.py --data data/starter --host 0.0.0.0 --port 8000
+    python scripts/web_ui.py --data data/full --host 0.0.0.0 --port 8000
 
-The default data tier comes from config.toml. Until the repository copy has
-telemetry.csv.gz, point --data at a tier directory that contains it.
+The default data tier comes from config.toml. Point --data at a tier directory
+that contains the telemetry (data/full parquet partitions or starter csv.gz).
 """
 from __future__ import annotations
 
