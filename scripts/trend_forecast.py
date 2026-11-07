@@ -1,3 +1,16 @@
+# vAInu pump-sensor-project - frontmatter
+#
+# Part of the Since AI 2026 hackathon (RETROFIT AI challenge).
+# Team vAInu 2026: Paavo Gaidach, Matias Hirvonen.
+# Licensed under the MIT License, Copyright (c) 2026 P.Gaidach & M.Hirvonen.
+# See the LICENSE file in the repository root for the full license text.
+#
+# Totally fictional: all data and scenarios are synthetic.
+#
+# Vibe coded. Not for real-world use as it is. This is a hackathon prototype:
+# it is not safety-certified and must not be used to monitor real machines,
+# make maintenance decisions, or protect people.
+
 """Trend forecast report (Layer 1 item 3).
 
 Prints, per asset and limit-bearing channel, where the trailing drift

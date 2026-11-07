@@ -28,7 +28,7 @@ authentication**, so run it only on a trusted network.
 **Start on the board** (from the project folder, e.g. `~/pump-sensor-project`):
 
 ```bash
-.venv/bin/python scripts/web_ui.py --data data/starter --host 0.0.0.0 --port 8000
+.venv/bin/python scripts/web_ui.py --data data/full --host 10.20.3.13 --port 8000
 ```
 
 Keep it running after you log out with `nohup` or a systemd service. A dashboard
@@ -63,5 +63,5 @@ The pilot panel reads `pilot/state.json`, so run the pilot first:
 |---------|-------|
 | Board not found | Try the IP; `hostname -I` via ADB; check the data cable |
 | `.local` name fails | Use the IP instead (mDNS blocked on some networks) |
-| Dashboard page does not load | Confirm the server is running and bound to `0.0.0.0`, not `127.0.0.1` |
+| Dashboard page does not load | Confirm the server is running and bound to `10.20.3.13`, not `127.0.0.1` |
 | Pilot panel empty | Run `pilot_run.py` first so `pilot/state.json` exists |

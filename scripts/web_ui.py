@@ -1,8 +1,21 @@
+# vAInu pump-sensor-project - frontmatter
+#
+# Part of the Since AI 2026 hackathon (RETROFIT AI challenge).
+# Team vAInu 2026: Paavo Gaidach, Matias Hirvonen.
+# Licensed under the MIT License, Copyright (c) 2026 P.Gaidach & M.Hirvonen.
+# See the LICENSE file in the repository root for the full license text.
+#
+# Totally fictional: all data and scenarios are synthetic.
+#
+# Vibe coded. Not for real-world use as it is. This is a hackathon prototype:
+# it is not safety-certified and must not be used to monitor real machines,
+# make maintenance decisions, or protect people.
+
 """Run the first-version vAInu web dashboard.
 
 Usage:
     python scripts/web_ui.py
-    python scripts/web_ui.py --data data/full --host 0.0.0.0 --port 8000
+    python scripts/web_ui.py --data data/full --host 10.20.3.13 --port 8000
 
 The default data tier comes from config.toml. Point --data at a tier directory
 that contains the telemetry (data/full parquet partitions or starter csv.gz).
