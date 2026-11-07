@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import math
 import sys
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -18,10 +19,16 @@ from src.web_ui import (
     STATUS_WATCH,
     AssetSeries,
     DashboardData,
+    _cache_key,
+    _read_cache,
+    _write_cache,
     json_safe,
+    severity_score,
     status_for,
     top_deviations,
+    window_options,
 )
+from src.math import rolling_robust_z
 
 
 def _fake_asset() -> AssetSeries:
@@ -82,6 +89,29 @@ def test_status_for_covers_all_states() -> None:
     assert status_for("RUNNING", False, None, 3.0, 0.5) == STATUS_UNKNOWN
 
 
+def test_severity_score_is_a_bounded_gauge() -> None:
+    assert severity_score(None, 3.0) is None
+    assert severity_score(float("nan"), 3.0) is None
+    assert severity_score(0.0, 3.0) == 0.0
+    assert severity_score(1.5, 3.0) == 40.0
+    assert severity_score(3.0, 3.0) == 80.0
+    assert severity_score(9.0, 3.0) == 100.0
+    assert severity_score(30.0, 3.0) == 100.0
+    assert 80.0 < severity_score(3.86, 3.0) < 100.0
+
+
+def test_window_options_cover_requested_intervals() -> None:
+    options = window_options([10, 60, 600, 1800, 3600], 1.0)
+    assert [option["label"] for option in options] == [
+        "10 s", "1 min", "10 min", "30 min", "60 min",
+    ]
+    assert [option["samples"] for option in options] == [10, 60, 600, 1800, 3600]
+    # A 10 s grid cannot show a 1 s window, and the counts scale with the grid.
+    coarse = window_options([10, 60, 600], 10.0)
+    assert [option["label"] for option in coarse] == ["10 s", "1 min", "10 min"]
+    assert [option["samples"] for option in coarse] == [2, 6, 60]
+
+
 def test_top_deviations_sorts_by_absolute_z() -> None:
     z_scores = {
         "a": np.array([0.1, 4.0]),
@@ -118,13 +148,63 @@ def test_asset_payload_keeps_explicit_empty_channel() -> None:
     assert all(math.isnan(value) for value in payload["values"])
 
 
+def test_rolling_robust_z_parallel_matches_serial() -> None:
+    """The process-pool path must reproduce the serial numbers exactly."""
+    rng = np.random.default_rng(7)
+    rows = 200
+    frame = pd.DataFrame({
+        "asset_id": ["A"] * rows + ["B"] * rows,
+        "value": np.concatenate([rng.normal(size=rows), rng.normal(size=rows)]),
+    })
+    serial = rolling_robust_z(frame, window=30, channels=["value"])
+    parallel = rolling_robust_z(frame, window=30, channels=["value"], workers=2)
+    pd.testing.assert_frame_equal(serial, parallel)
+
+
+def test_surface_cache_round_trip() -> None:
+    frame = pd.DataFrame({"asset_id": ["A"] * 4 + ["B"] * 3})
+    z_smooth = pd.DataFrame(
+        {"z_value": np.arange(7, dtype=float)}, index=frame.index,
+    )
+    alarm = pd.Series(
+        [False, True, False, False, True, False, False], index=frame.index,
+    )
+    with tempfile.TemporaryDirectory() as directory:
+        cache_file = Path(directory) / "surface.npz"
+        _write_cache(cache_file, frame, z_smooth, alarm, ["value"], None)
+
+        loaded = _read_cache(cache_file, {"A": 4, "B": 3}, ["value"])
+        assert loaded is not None
+        blocks, manifest = loaded
+        assert manifest["channels"] == ["value"]
+        assert blocks["A"]["alarm"].tolist() == [False, True, False, False]
+        assert blocks["B"]["z"].ravel().tolist() == [4.0, 5.0, 6.0]
+        # A changed row count must not be served from the cache.
+        assert _read_cache(cache_file, {"A": 4, "B": 4}, ["value"]) is None
+
+
+def test_cache_key_tracks_settings() -> None:
+    with tempfile.TemporaryDirectory() as directory:
+        tier = Path(directory) / "tier"
+        tier.mkdir()
+        (tier / "assets.csv").write_text("asset_id\nA\n", encoding="utf-8")
+        first = _cache_key(tier, tier, 60, 3.0)
+        assert first == _cache_key(tier, tier, 60, 3.0)
+        assert first != _cache_key(tier, tier, 120, 3.0)
+
+
 if __name__ == "__main__":
     for function in (
         test_json_safe_handles_missing_and_numpy,
         test_status_for_covers_all_states,
+        test_severity_score_is_a_bounded_gauge,
+        test_window_options_cover_requested_intervals,
         test_top_deviations_sorts_by_absolute_z,
         test_asset_payload_falls_back_to_channel_with_data,
         test_asset_payload_keeps_explicit_empty_channel,
+        test_rolling_robust_z_parallel_matches_serial,
+        test_surface_cache_round_trip,
+        test_cache_key_tracks_settings,
     ):
         function()
         print(f"PASS {function.__name__}")

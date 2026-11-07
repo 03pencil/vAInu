@@ -3,13 +3,23 @@ from __future__ import annotations
 
 import os
 import tomllib
+from pathlib import Path
 
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config.toml")
+
+# Chart-window choices in seconds; the UI scales them to the data grid.
+DEFAULT_WINDOW_INTERVALS = (10, 60, 600, 1800, 3600)
 
 _WEB_UI_DEFAULTS = {
     "host": "127.0.0.1",
     "port": 8000,
     "refresh_seconds": 2,
+    "history_samples": 600,
+    "window_intervals": list(DEFAULT_WINDOW_INTERVALS),
+    "watch_fraction": 0.5,
+    "default_channel": "vibration_rms_mm_s",
+    "alarm_mark": 80.0,
+    "cache_dir": "cache/web_ui",
     "history_samples": 240,
     "watch_fraction": 0.5,
     "default_channel": "vibration_rms_mm_s",
@@ -103,3 +113,28 @@ def get_web_ui_config(cfg: dict | None = None) -> dict:
     values = dict(_WEB_UI_DEFAULTS)
     values.update(cfg.get("web_ui", {}))
     return values
+
+
+def get_worker_count(cfg: dict | None = None) -> int:
+    """Worker processes for [compute] steps.
+
+    ``workers = 0`` (the default) means auto: every logical CPU but one, so
+    the desktop stays responsive. ``workers = 1`` forces the serial path.
+    """
+    if cfg is None:
+        cfg = load_config()
+    workers = int(cfg.get("compute", {}).get("workers", 0))
+    if workers > 0:
+        return workers
+    return max(1, (os.cpu_count() or 1) - 1)
+
+
+def get_cache_dir(cfg: dict | None = None) -> Path:
+    """Directory for rebuild caches; relative paths resolve from the repo root."""
+    if cfg is None:
+        cfg = load_config()
+    value = str(cfg.get("web_ui", {}).get("cache_dir", "cache/web_ui"))
+    path = Path(value).expanduser()
+    if not path.is_absolute():
+        path = Path(CONFIG_FILE).parent / path
+    return path

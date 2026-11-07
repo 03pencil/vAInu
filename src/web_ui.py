@@ -12,9 +12,12 @@ narration layer is a later milestone.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import math
+import os
 import sys
+import time
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -24,7 +27,11 @@ from urllib.parse import parse_qs, unquote, urlparse
 import numpy as np
 import pandas as pd
 
-from .config import get_smoothing_window, get_z_threshold
+from .config import (
+    DEFAULT_WINDOW_INTERVALS,
+    get_smoothing_window,
+    get_z_threshold,
+)
 from .data_input import channel_columns, load_channel_units, load_telemetry
 from .labels import (
     FAULT_LABELS,
@@ -42,6 +49,15 @@ STATUS_WATCH = "WATCH"
 STATUS_ALARM = "ALARM"
 STATUS_IDLE = "IDLE"
 STATUS_UNKNOWN = "UNKNOWN"
+
+# Bump when the alarm math changes so old caches are ignored.
+CACHE_VERSION = 1
+CACHE_INPUT_SUFFIXES = {".parquet", ".csv", ".gz", ".json"}
+
+# Severity gauge: the alarm threshold lands on ALARM_MARK and
+# SEVERE_MULTIPLE x the threshold reaches 100.
+ALARM_MARK = 80.0
+SEVERE_MULTIPLE = 3.0
 
 
 def _text(value: Any) -> str:
@@ -130,6 +146,219 @@ def max_abs_z(series: "AssetSeries", index: int, channels: list[str]) -> float |
     return max(scores) if scores else None
 
 
+def severity_score(
+    max_abs_z: "float | None",
+    z_threshold: float,
+    alarm_mark: float = ALARM_MARK,
+) -> "float | None":
+    """Map a raw |z| onto the 0-100 gauge shown in the UI.
+
+    Zero deviation is 0, the alarm threshold lands on `alarm_mark`, and
+    `SEVERE_MULTIPLE` times the threshold reaches 100. The mapping is
+    monotonic, so ordering between samples is preserved.
+    """
+    if max_abs_z is None:
+        return None
+    magnitude = abs(float(max_abs_z))
+    if not math.isfinite(magnitude):
+        return None
+    threshold = float(z_threshold)
+    if threshold <= 0:
+        return 0.0
+    if magnitude < threshold:
+        return max(0.0, alarm_mark * magnitude / threshold)
+    headroom = max(SEVERE_MULTIPLE - 1.0, 1e-9)
+    excess = (magnitude - threshold) / (headroom * threshold)
+    return min(100.0, alarm_mark + (100.0 - alarm_mark) * excess)
+
+
+def _duration_label(seconds: int) -> str:
+    """Human label for a chart window (45 s, 10 min)."""
+    if seconds < 60:
+        return f"{seconds} s"
+    return f"{seconds // 60} min"
+
+
+def window_options(
+    intervals: "list[int]",
+    sample_seconds: float,
+) -> list[dict[str, Any]]:
+    """Chart-window choices: wall-clock label plus sample count for this grid."""
+    sample = float(sample_seconds) if sample_seconds else 1.0
+    options: list[dict[str, Any]] = []
+    for seconds in intervals:
+        seconds = int(seconds)
+        if seconds < sample:
+            continue
+        options.append({
+            "seconds": seconds,
+            "samples": max(2, int(round(seconds / sample))),
+            "label": _duration_label(seconds),
+        })
+    return options
+
+
+def _sample_seconds(frame: pd.DataFrame) -> float:
+    """Median sample spacing of the tier (1.0 on the 1 Hz full tier)."""
+    if frame.empty or "timestamp_utc" not in frame.columns:
+        return 1.0
+    try:
+        deltas = frame["timestamp_utc"].iloc[:200].diff().dt.total_seconds().dropna()
+    except (TypeError, AttributeError):
+        return 1.0
+    if deltas.empty:
+        return 1.0
+    spacing = float(deltas.median())
+    return spacing if spacing > 0 else 1.0
+
+
+def _cache_inputs(tier_dir: Path, path: Path) -> list[Path]:
+    """Files whose contents determine the alarm surface for one tier."""
+    if path.is_file():
+        return [path]
+    return sorted(
+        item for item in tier_dir.rglob("*")
+        if item.is_file() and item.suffix.lower() in CACHE_INPUT_SUFFIXES
+    )
+
+
+def _cache_key(tier_dir: Path, path: Path, smoothing: int, z_threshold: float) -> str:
+    """Content fingerprint of the tier plus the settings that shape the surface."""
+    digest = hashlib.sha256()
+    digest.update(f"v{CACHE_VERSION}|{smoothing}|{z_threshold}".encode())
+    for item in _cache_inputs(tier_dir, path):
+        stat = item.stat()
+        relative = item.relative_to(tier_dir).as_posix()
+        digest.update(f"{relative}|{stat.st_size}|{stat.st_mtime_ns}".encode())
+    return digest.hexdigest()[:20]
+
+
+def _surface_from_cache(
+    blocks: dict[str, dict[str, np.ndarray]],
+    frame: pd.DataFrame,
+    channels: list[str],
+) -> "tuple[pd.DataFrame, pd.Series]":
+    """Rebuild the alarm surface from cached per-asset blocks."""
+    positions = frame.groupby("asset_id", sort=False).indices
+    z_values = np.full((len(frame), len(channels)), np.nan, dtype=float)
+    alarms = np.zeros(len(frame), dtype=bool)
+    for asset_id, block in blocks.items():
+        index = positions.get(asset_id)
+        if index is None:
+            continue
+        z_values[index] = block["z"]
+        alarms[index] = block["alarm"]
+    return (
+        pd.DataFrame(z_values, index=frame.index,
+                     columns=[f"z_{channel}" for channel in channels]),
+        pd.Series(alarms, index=frame.index),
+    )
+
+
+def _read_cache(
+    cache_file: "Path | None",
+    rows: dict[str, int],
+    channels: list[str],
+) -> "tuple[dict[str, dict[str, np.ndarray]], dict[str, Any]] | None":
+    """Load a cached surface, or None when it is missing or does not match."""
+    if cache_file is None or not cache_file.exists():
+        return None
+    try:
+        with np.load(cache_file, allow_pickle=False) as archive:
+            manifest = json.loads(str(archive["manifest"]))
+            if manifest.get("version") != CACHE_VERSION:
+                return None
+            if manifest.get("channels") != list(channels):
+                return None
+            if manifest.get("rows") != rows:
+                return None
+            blocks: dict[str, dict[str, np.ndarray]] = {}
+            for asset_id in manifest.get("assets", []):
+                scores = archive[f"{asset_id}|z"]
+                alarm = archive[f"{asset_id}|alarm"]
+                if scores.shape != (rows[asset_id], len(channels)):
+                    return None
+                blocks[asset_id] = {
+                    "z": scores.astype(np.float64, copy=False),
+                    "alarm": alarm.astype(bool, copy=False),
+                }
+    except (OSError, KeyError, ValueError, json.JSONDecodeError):
+        return None
+    return blocks, manifest
+
+
+def _write_cache(
+    cache_file: Path,
+    frame: pd.DataFrame,
+    z_smooth: pd.DataFrame,
+    alarm: pd.Series,
+    channels: list[str],
+    warning: "str | None",
+) -> None:
+    """Persist the alarm surface; stale surfaces in the same directory go away."""
+    z_columns = [f"z_{channel}" for channel in channels]
+    rows = {str(asset): int(size)
+            for asset, size in frame.groupby("asset_id").size().items()}
+    manifest = {
+        "version": CACHE_VERSION,
+        "channels": list(channels),
+        "rows": rows,
+        "assets": sorted(rows),
+        "warning": warning,
+    }
+    payload: dict[str, np.ndarray] = {"manifest": np.array(json.dumps(manifest))}
+    for asset_id, index in frame.groupby("asset_id", sort=False).indices.items():
+        key = str(asset_id)
+        payload[f"{key}|z"] = z_smooth.iloc[index][z_columns].to_numpy(dtype=np.float32)
+        payload[f"{key}|alarm"] = alarm.iloc[index].to_numpy(dtype=bool)
+
+    cache_file.parent.mkdir(parents=True, exist_ok=True)
+    for stale in cache_file.parent.glob("*.npz"):
+        if stale != cache_file:
+            stale.unlink(missing_ok=True)
+    temporary = cache_file.with_name(f"{cache_file.name}.tmp.npz")
+    np.savez(temporary, **payload)
+    os.replace(temporary, cache_file)
+
+
+def _build_surface(
+    frame: pd.DataFrame,
+    tier_dir: Path,
+    channels: list[str],
+    smoothing: int,
+    z_threshold: float,
+    workers: "int | None" = None,
+) -> "tuple[pd.DataFrame, pd.Series, str | None]":
+    """Label the tier, build the robust envelope, and score every sample."""
+    warning = None
+    try:
+        events = load_events(str(tier_dir))
+        benign = load_benign_windows(str(tier_dir))
+        labeled = label_telemetry(frame, events, benign)
+    except FileNotFoundError:
+        labeled = frame.copy()
+        labeled[LABEL_COLUMN] = LABEL_UNKNOWN
+        warning = ("Event/benign label tables were not found; the healthy "
+                   "envelope was fitted on all rows.")
+
+    envelope = merged_stats(labeled[~labeled[LABEL_COLUMN].isin(FAULT_LABELS)], channels)
+    z = modified_zscores(labeled, envelope, channels)
+    z_keyed = pd.concat([labeled[["asset_id"]], z], axis=1)
+    z_smooth = group_rolled(z_keyed, window=smoothing)
+    z_columns = [column for column in z_smooth.columns if column.startswith("z_")]
+    z_rolled = rolling_robust_z(
+        labeled, window=smoothing, channels=channels, workers=workers,
+    )
+    env_missing = z_smooth[z_columns].isna().all(axis=1)
+    z_smooth.loc[env_missing, z_columns] = z_rolled.loc[env_missing, z_columns]
+
+    alarm = (
+        (z_smooth[z_columns].abs() > z_threshold).any(axis=1)
+        & (labeled["operating_mode"] == "RUNNING")
+    )
+    return z_smooth, alarm, warning
+
+
 @dataclass(frozen=True)
 class AssetSeries:
     """Per-asset arrays used by the dashboard API."""
@@ -159,65 +388,84 @@ class DashboardData:
     z_threshold: float
     watch_fraction: float
     default_channel: str
+    alarm_mark: float = ALARM_MARK
+    sample_seconds: float = 1.0
     warning: str | None = None
+    cache_hit: bool = False
+    build_seconds: float = 0.0
 
     def __post_init__(self) -> None:
         self._by_id = {item.asset_id: item for item in self.series}
 
     @classmethod
     def from_data_dir(cls, data_dir: str | Path, **kwargs: Any) -> "DashboardData":
-        """Load a tier (or explicit telemetry file) and build the alarm surface."""
+        """Load a tier (or explicit telemetry file) and build the alarm surface.
+
+        ``workers`` maps the per-asset rolling step onto that many processes.
+        ``cache_dir`` stores the finished surface so a restart skips the
+        expensive rebuild; ``rebuild=True`` forces a fresh build.
+        """
+        started = time.perf_counter()
         path = Path(data_dir)
         tier_dir = path.parent if path.is_file() else path
         frame = load_telemetry(str(path), join_assets=True)
-        warning = None
-        try:
-            events = load_events(str(tier_dir))
-            benign = load_benign_windows(str(tier_dir))
-            frame = label_telemetry(frame, events, benign)
-        except FileNotFoundError:
-            frame = frame.copy()
-            frame[LABEL_COLUMN] = LABEL_UNKNOWN
-            warning = ("Event/benign label tables were not found; the healthy "
-                       "envelope was fitted on all rows.")
-
         channels = channel_columns(frame)
         if not channels:
             raise ValueError("No telemetry channels found in the selected data tier.")
+        sample_seconds = _sample_seconds(frame)
 
         smoothing = get_smoothing_window()
         z_threshold = get_z_threshold()
-        envelope = merged_stats(frame[~frame[LABEL_COLUMN].isin(FAULT_LABELS)], channels)
-        z = modified_zscores(frame, envelope, channels)
-        z_keyed = pd.concat([frame[["asset_id"]], z], axis=1)
-        z_smooth = group_rolled(z_keyed, window=smoothing)
-        z_cols = [column for column in z_smooth.columns if column.startswith("z_")]
-        z_rolled = rolling_robust_z(frame, window=smoothing, channels=channels)
-        env_missing = z_smooth[z_cols].isna().all(axis=1)
-        z_smooth.loc[env_missing, z_cols] = z_rolled.loc[env_missing, z_cols]
+        rows = {str(asset): int(size)
+                for asset, size in frame.groupby("asset_id").size().items()}
 
-        alarm = (
-            (z_smooth[z_cols].abs() > z_threshold).any(axis=1)
-            & (frame["operating_mode"] == "RUNNING")
-        )
+        cache_dir = kwargs.get("cache_dir")
+        cache_file = None
+        if cache_dir is not None:
+            cache_file = (Path(cache_dir)
+                          / f"{_cache_key(tier_dir, path, smoothing, z_threshold)}.npz")
+            if kwargs.get("rebuild"):
+                cache_file.unlink(missing_ok=True)
+
+        cached = _read_cache(cache_file, rows, channels)
+        if cached is not None:
+            blocks, manifest = cached
+            z_smooth, alarm = _surface_from_cache(blocks, frame, channels)
+            warning = manifest.get("warning")
+            cache_hit = True
+        else:
+            z_smooth, alarm, warning = _build_surface(
+                frame, tier_dir, channels, smoothing, z_threshold,
+                kwargs.get("workers"),
+            )
+            cache_hit = False
+            if cache_file is not None:
+                _write_cache(cache_file, frame, z_smooth, alarm, channels, warning)
+
         units = load_channel_units(str(tier_dir / "data_dictionary.csv"))
 
+        positions = frame.groupby("asset_id", sort=True).indices
+        mode_values = frame["operating_mode"].astype(str).to_numpy()
+        value_arrays = {channel: frame[channel].to_numpy(dtype=float)
+                        for channel in channels}
+        z_arrays = {channel: z_smooth[f"z_{channel}"].to_numpy(dtype=float)
+                    for channel in channels}
+        alarm_array = alarm.to_numpy(dtype=bool)
         series: list[AssetSeries] = []
-        for asset_id, group in frame.groupby("asset_id", sort=True):
-            index = group.index
-            meta = group.iloc[0]
+        for asset_id in sorted(positions):
+            index = positions[asset_id]
+            meta = frame.iloc[index[0]]
             series.append(AssetSeries(
                 asset_id=str(asset_id),
                 profile=_text(meta.get("profile")),
                 control=_text(meta.get("control")),
                 instrumentation_tier=_text(meta.get("instrumentation_tier")),
-                timestamps=pd.DatetimeIndex(group["timestamp_utc"]),
-                modes=group["operating_mode"].astype(str).to_numpy(),
-                values={channel: group[channel].to_numpy(dtype=float)
+                timestamps=pd.DatetimeIndex(frame["timestamp_utc"].iloc[index]),
+                modes=mode_values[index],
+                values={channel: value_arrays[channel][index]
                         for channel in channels},
-                z={channel: z_smooth.loc[index, f"z_{channel}"].to_numpy(dtype=float)
-                   for channel in channels},
-                alarm=alarm.loc[index].to_numpy(dtype=bool),
+                z={channel: z_arrays[channel][index] for channel in channels},
+                alarm=alarm_array[index],
             ))
 
         return cls(
@@ -227,7 +475,11 @@ class DashboardData:
             z_threshold=z_threshold,
             watch_fraction=kwargs.get("watch_fraction", 0.5),
             default_channel=kwargs.get("default_channel", "vibration_rms_mm_s"),
+            alarm_mark=kwargs.get("alarm_mark", ALARM_MARK),
+            sample_seconds=sample_seconds,
             warning=warning,
+            cache_hit=cache_hit,
+            build_seconds=time.perf_counter() - started,
         )
 
     @property
@@ -252,7 +504,9 @@ class DashboardData:
                 "instrumentation_tier": item.instrumentation_tier,
                 "mode": str(item.modes[index]),
                 "status": status,
-                "alarm_score": score,
+                "alarm_score": severity_score(
+                    score, self.z_threshold, self.alarm_mark),
+                "alarm_z": score,
                 "last_update": item.timestamps[index].isoformat(),
                 "top": top[0] if top else None,
             })
@@ -311,7 +565,8 @@ class DashboardData:
             "instrumentation_tier": item.instrumentation_tier,
             "mode": str(item.modes[cursor]),
             "status": status,
-            "alarm_score": score,
+            "alarm_score": severity_score(score, self.z_threshold, self.alarm_mark),
+            "alarm_z": score,
             "last_update": item.timestamps[cursor].isoformat(),
             "total": total,
             "cursor": cursor,
@@ -390,8 +645,14 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 self._send_json({
                     "refresh_seconds": self.web_config["refresh_seconds"],
                     "history_samples": self.web_config["history_samples"],
+                    "sample_seconds": self.data.sample_seconds,
+                    "windows": window_options(
+                        self.web_config["window_intervals"],
+                        self.data.sample_seconds,
+                    ),
                     "z_threshold": self.data.z_threshold,
                     "watch_fraction": self.data.watch_fraction,
+                    "alarm_mark": self.data.alarm_mark,
                     "default_channel": self.data.default_channel,
                 })
             elif parsed.path == "/api/overview":
@@ -478,7 +739,8 @@ def serve(
     host: str = "127.0.0.1",
     port: int = 8000,
     refresh_seconds: float = 2.0,
-    history_samples: int = 240,
+    history_samples: int = 600,
+    window_intervals: "list[int] | None" = None,
     verbose: bool = False,
     pilot_state_path: "Path | None" = None,
 ) -> None:
@@ -491,6 +753,8 @@ def serve(
             "web_config": {
                 "refresh_seconds": refresh_seconds,
                 "history_samples": history_samples,
+                "window_intervals": list(
+                    window_intervals or DEFAULT_WINDOW_INTERVALS),
             },
             "pilot_state_path": pilot_state_path,
             "verbose": verbose,
@@ -711,7 +975,7 @@ h2 { margin: 0; font-size: 15px; font-weight: 600; }
     <section class="cards">
       <div class="card"><div class="label">Operating mode</div><div id="mode" class="value">-</div></div>
       <div class="card"><div class="label">Last sample</div><div id="last-update" class="value small">-</div></div>
-      <div class="card"><div class="label">Alarm score</div><div id="alarm-score" class="value">-</div></div>
+      <div class="card"><div class="label">Alarm score / 100</div><div id="alarm-score" class="value">-</div></div>
       <div class="card"><div class="label">Channel</div><div id="channel-label" class="value small">-</div></div>
     </section>
     <section class="panel">
@@ -719,12 +983,7 @@ h2 { margin: 0; font-size: 15px; font-weight: 600; }
         <h2>Signal</h2>
         <div class="controls">
           <select id="channel-select" class="select"></select>
-          <select id="window-select" class="select">
-            <option value="60">10 min</option>
-            <option value="240" selected>40 min</option>
-            <option value="720">2 h</option>
-            <option value="2160">6 h</option>
-          </select>
+          <select id="window-select" class="select"></select>
         </div>
       </div>
       <div id="chart" class="chart"></div>
@@ -748,7 +1007,7 @@ h2 { margin: 0; font-size: 15px; font-weight: 600; }
       <section class="panel">
         <div class="panel-head"><h2>Top deviations</h2></div>
         <div id="top-deviations" class="deviations"></div>
-        <div class="hint">Robust modified z-score; alarm threshold <span id="threshold-label">-</span>.</div>
+        <div class="hint">Severity 0-100 (alarm at <span id="alarm-mark-label">-</span>); robust z threshold <span id="threshold-label">-</span>.</div>
       </section>
     </div>
     <section class="panel">
@@ -833,6 +1092,11 @@ function formatZ(score) {
   return (score >= 0 ? "+" : "") + Number(score).toFixed(2) + "s";
 }
 
+function formatScore(score) {
+  if (score === null || score === undefined || Number.isNaN(score)) return "-";
+  return Number(score).toFixed(1) + " / 100";
+}
+
 function zClass(score, threshold) {
   if (score === null || score === undefined || Number.isNaN(score)) return "";
   const abs = Math.abs(score);
@@ -843,9 +1107,22 @@ function zClass(score, threshold) {
 
 async function loadConfig() {
   state.config = await api("/api/config");
+  const select = $("window-select");
+  select.innerHTML = "";
+  for (const entry of state.config.windows || []) {
+    const option = document.createElement("option");
+    option.value = String(entry.samples);
+    option.textContent = entry.label;
+    select.appendChild(option);
+  }
+  const samples = [...select.options].map((option) => Number(option.value));
+  state.window = Number(state.config.history_samples) || state.window;
+  if (!samples.includes(state.window)) {
+    state.window = samples[samples.length - 1] || state.window;
+  }
+  select.value = String(state.window);
   $("threshold-label").textContent = Number(state.config.z_threshold).toFixed(1) + "s";
-  state.window = state.config.history_samples || state.window;
-  $("window-select").value = String(state.window);
+  $("alarm-mark-label").textContent = Number(state.config.alarm_mark).toFixed(0);
 }
 
 async function loadPilot() {
@@ -944,8 +1221,7 @@ function render() {
   badge.className = "status " + statusClass(data.status);
   $("mode").textContent = data.mode || "-";
   $("last-update").textContent = formatTime(data.last_update);
-  $("alarm-score").textContent = data.alarm_score === null
-    ? "-" : Number(data.alarm_score).toFixed(2) + "s";
+  $("alarm-score").textContent = formatScore(data.alarm_score);
   $("channel-label").textContent = data.channel + " (" + (data.unit || "-") + ")";
   $("live-label").textContent = state.playing
     ? "REPLAY" : (state.cursor >= data.total - 1 ? "LATEST" : "PAUSED");
