@@ -41,7 +41,7 @@ See [`plan.md`](plan.md) for the full architecture and roadmap, and [`to-do.md`]
 - `data/` — pump telemetry dataset (`full/` + `starter/`). **Read-only**; the only data source.
 - `skills/` — coding and data guidelines for humans and LLMs.
 - `skill_data.md` — notes about the dataset and its handling.
-- `plan.md` / `to-do.md` — roadmap and task breakdown.
+- `plan.md` / `to-do.md` / [`bom.md`](bom.md) — roadmap, task breakdown, and minimal hardware BOM.
 
 ## Tech Stack
 

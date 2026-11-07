@@ -10,6 +10,17 @@ Pump sensors send telemetry to a logic box, which delivers it to an Arduino UNO 
 - Logic box -> Arduino UNO Q (single inbound data path; MCU receives, MPU runs LLM inference).
 - Arduino UNO Q -> minimal web UI (served by MPU, local network) showing live values + predictions; no inbound from elsewhere.
 
+## Hardware (BOM)
+
+Minimal hardware only — see [`bom.md`](bom.md). Key notions:
+
+- UNO Q board **provided** (Majos Hacking League); prefer the ABX00173 4 GB variant for SmolLM.
+- Power must come from a dedicated 5 V / 3 A USB-C wall adapter, not a PC port.
+- USB-A→C cable for one-time setup (ADB / App Lab) from the host PC.
+- Wi-Fi is built in: no antenna, no hub, no monitor. Web UI runs headless.
+- Logic box → MCU link is plain 3.3 V UART (TX/RX/GND jumper wires); level shifter only if the logic box outputs 5 V.
+- Excluded on purpose: camera, bricks, display, SD, enclosure.
+
 ## Phases
 
 1. Explore data: load starter telemetry with pandas, inspect channels, asset tiers.

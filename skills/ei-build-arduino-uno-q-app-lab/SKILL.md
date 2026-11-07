@@ -44,6 +44,16 @@ Use the detailed [reference](references/REFERENCE.md) selectively. Check current
 7. Do not commit EIM model binaries unless the user explicitly wants them versioned.
 8. Validate the manifest, run the app, inspect logs, and exercise the complete MCU-to-MPU or model-to-UI path.
 
+## Project hardware notes
+
+- Minimal BOM lives in the repo root (`bom.md`); power is a dedicated 5 V / 3 A
+  USB-C adapter and setup happens over one USB-A→C cable, then the board runs
+  headless on built-in Wi-Fi.
+- This project's logic box feeds the MCU over plain 3.3 V UART (TX/RX/GND);
+  UNO Q digital I/O is 3.3 V logic — level shifter only if the logic box drives 5 V.
+- MPU inference is SmolLM served by Ollama, not Edge Impulse; EIM bricks are not
+  part of this project.
+
 ## Guardrails
 
 - Use Linux APIs on the MPU and Arduino APIs in the MCU sketch.
