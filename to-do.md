@@ -157,8 +157,12 @@ Recorded so later layers can be compared against them:
 - [ ] Bench test on the UNO Q per `arduino_uno_q_install.md` section 7
   (Python 3.11+ check, copy project + telemetry, venv, tests, pilot, LAN
   dashboard). Record wall time, RAM, errors.
-- [ ] Decide the SmolLM tag for the UNO Q: manual installs `smollm2:1.7b`,
-  `plan.md` / `skill_data.md` name `smollm2:135m`.
+- [x] Decide the SmolLM tag for the UNO Q: `smollm2:1.7b` (better structured
+  output; fits the 4 GB board). `plan.md` / `skill_data.md` still name
+  `smollm2:135m` for the host chain; update them when the SmolLM layer lands.
+- [ ] Board test step 1: pilot + web UI without LLM (manual section 7).
+- [ ] Board test step 2: SmolLM layer on the board (Ollama install per manual
+  sections 4–5, serializer, alarm-triggered call, JSON validation, fallback).
 - [x] First local web UI prototype (`scripts/web_ui.py`, `src/web_ui.py`):
   asset status, latest values, top deviations, channel chart, replay;
   stdlib server only.
