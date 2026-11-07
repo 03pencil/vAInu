@@ -5,6 +5,7 @@
 #   scripts/run_board.sh setup        create .venv and install pinned requirements
 #   scripts/run_board.sh test         run every tests/test_*.py
 #   scripts/run_board.sh pilot        replay the starter tier into pilot/
+#   scripts/run_board.sh stream       live-style replay: one frame per line, paced (like the UART link)
 #   scripts/run_board.sh narrate      narrate new alarms (LLM if [llm] enabled = true)
 #   scripts/run_board.sh dashboard    serve the web UI (foreground, Ctrl+C to stop)
 #   scripts/run_board.sh all          setup, test, pilot, narrate, then dashboard
@@ -14,7 +15,7 @@
 #   --data DIR    tier directory            (default: data/starter)
 #   --host HOST   dashboard bind address    (default: 0.0.0.0)
 #   --port PORT   dashboard port            (default: 8000)
-#   --speed N     replay speed, 0 = fastest (default: 0)
+#   --speed N     replay speed, 0 = fastest (default: 1 for stream, 0 for pilot)
 #   --skip-tests  with "all": skip the test step
 set -euo pipefail
 
@@ -27,7 +28,7 @@ VENV_PY="$ROOT/.venv/bin/python"
 DATA="data/starter"
 HOST="0.0.0.0"
 PORT="8000"
-SPEED="0"
+SPEED=""
 SKIP_TESTS="no"
 COMMAND=""
 
@@ -35,13 +36,13 @@ log() { printf '\n==> %s\n' "$*"; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
 usage() {
-  sed -n '2,18p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '2,/^set -euo/{/^set -euo/d;p}' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 }
 
 parse_args() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      setup|test|pilot|narrate|dashboard|all|check) COMMAND="$1" ;;
+      setup|test|pilot|stream|narrate|dashboard|all|check) COMMAND="$1" ;;
       --data) DATA="${2:?--data needs a value}"; shift ;;
       --host) HOST="${2:?--host needs a value}"; shift ;;
       --port) PORT="${2:?--port needs a value}"; shift ;;
@@ -65,6 +66,20 @@ EOF
 
 need_venv() {
   [[ -x "$VENV_PY" ]] || die "no .venv yet. Run: scripts/run_board.sh setup"
+}
+
+check_project_files() {
+  local required=(
+    scripts/pilot_run.py scripts/simulate_stream.py scripts/narrate.py scripts/web_ui.py
+    src/config.py src/feed.py src/narration.py src/web_ui.py config.toml requirements.txt
+  )
+  local missing=()
+  for file in "${required[@]}"; do
+    [[ -f "$file" ]] || missing+=("$file")
+  done
+  if (( ${#missing[@]} > 0 )); then
+    die "project is incomplete, missing: ${missing[*]}. Copy the whole project again (see the ssh steps)."
+  fi
 }
 
 need_telemetry() {
@@ -117,8 +132,16 @@ cmd_test() {
 cmd_pilot() {
   need_venv
   need_telemetry
-  log "Pilot replay ($DATA, speed $SPEED)"
-  "$VENV_PY" scripts/pilot_run.py --data "$DATA" --speed "$SPEED"
+  log "Pilot replay ($DATA, speed ${SPEED:-0})"
+  "$VENV_PY" scripts/pilot_run.py --data "$DATA" --speed "${SPEED:-0}"
+}
+
+cmd_stream() {
+  need_venv
+  need_telemetry
+  log "Live-style stream ($DATA, speed ${SPEED:-1}; one frame per line)"
+  "$VENV_PY" scripts/simulate_stream.py --data "$DATA" --speed "${SPEED:-1}" \
+    | "$VENV_PY" scripts/pilot_run.py --stdin --data "$DATA"
 }
 
 cmd_narrate() {
@@ -150,6 +173,7 @@ cmd_dashboard() {
 cmd_check() {
   log "Status"
   check_system_python
+  if (check_project_files) 2>/dev/null; then echo "files:     complete"; else echo "files:     INCOMPLETE (copy the whole project again)"; fi
   echo "Python:    $(python3 --version)"
   echo "Repo:      $ROOT"
   if [[ -x "$VENV_PY" ]]; then echo "venv:      ready"; else echo "venv:      missing (run setup)"; fi
@@ -165,6 +189,7 @@ cmd_check() {
 }
 
 cmd_all() {
+  check_project_files
   cmd_setup
   if [[ "$SKIP_TESTS" == "no" ]]; then cmd_test; else echo "Skipping tests (--skip-tests)."; fi
   cmd_pilot
@@ -178,6 +203,7 @@ case "$COMMAND" in
   setup) cmd_setup ;;
   test) cmd_test ;;
   pilot) cmd_pilot ;;
+  stream) cmd_stream ;;
   narrate) cmd_narrate ;;
   dashboard) cmd_dashboard ;;
   all) cmd_all ;;
