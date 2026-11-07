@@ -1,15 +1,15 @@
 # vAInu — Pump Sensor Project
 
-vAInu watches pump sensors and warns about developing faults before they cause a stop. It runs on an Arduino UNO Q, a small board with a Linux processor and a microcontroller.
+vAInu helps spot pump problems early. It reads sensor data, looks for signs that something may be going wrong, and shows warnings on a local web dashboard. The analysis runs on an Arduino UNO Q.
 
 Built for the **SinceAI 2026 Hackathon** in Turku.
 
 ## What it does
 
-- Reads pump telemetry (pressure, flow, temperature, vibration, and more).
-- Compares it with what "healthy" looks like for that pump and its operating mode.
-- Raises early warnings and estimates how long until a limit is reached.
-- Explains each warning in plain language (SmolLM, planned).
+- Reads pump sensor data, such as pressure, flow, temperature, and vibration.
+- Checks for readings that are unusual for the pump.
+- Shows early warnings and estimates how soon a reading may reach a limit.
+- Plans to explain warnings in plain language (SmolLM).
 
 vAInu is **advisory only**. It never controls the pump and never writes to hardware. A person always makes the decision.
 
@@ -17,13 +17,12 @@ vAInu is **advisory only**. It never controls the pump and never writes to hardw
 
 ```mermaid
 flowchart LR
-    A[Pump sensors] --> B[Logic box]
-    B --> C[Arduino UNO Q]
-    C --> D[Analysis and SmolLM]
-    D --> E[Web dashboard on the local network]
+    A[Pump sensors] --> B[PLC]
+    B -->|Sensor data| C[Arduino UNO Q<br/>AI Analysis]
+    C --> D[Web dashboard on the local network]
 ```
 
-The UNO Q receives data from the logic box over a single serial link. It has no other inbound connections.
+The PLC sends sensor data to the Arduino UNO Q over a single serial connection. The Arduino analyzes the data and makes the dashboard available on the local network.
 
 ## Quick start
 
