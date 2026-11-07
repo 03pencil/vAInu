@@ -104,6 +104,7 @@ def merged_stats(
                     [fb_med.to_numpy()], columns=fb_med.index, index=index))
                 added_mad.append(pd.DataFrame(
                     [fb_mad.to_numpy()], columns=fb_mad.index, index=index))
+                    [fb_mad.to_numpy()], columns=fb_med.index, index=index))
     if added_median:
         stats["median"] = pd.concat([stats["median"], *added_median]).sort_index()
         stats["mad"] = pd.concat([stats["mad"], *added_mad]).sort_index()

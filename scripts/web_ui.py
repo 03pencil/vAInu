@@ -22,6 +22,7 @@ from src.config import (
     get_web_ui_config,
     get_worker_count,
 )
+from src.config import get_data_dir, get_web_ui_config  # noqa: E402
 from src.web_ui import DashboardData, serve  # noqa: E402
 
 
@@ -92,6 +93,7 @@ def main() -> None:
         f"in {data.build_seconds:.1f}s ({source}).",
         flush=True,
     )
+    print(f"Loaded {len(data.asset_ids)} assets and {len(data.channels)} channels.", flush=True)
     serve(
         data,
         host=host,

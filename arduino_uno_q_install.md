@@ -39,7 +39,7 @@ for your operating system. Install like any other desktop app.
 
 ### 1.1 Linux (Debian Bookworm+ / Ubuntu 22.04+)
 
-Two extra steps (official Arduino docs, `docs.arduino.cc/software/app-lab/setup/linux/`):
+Three steps (official Arduino docs, `docs.arduino.cc/software/app-lab/setup/linux/`):
 
 1. **UI library:**
 
@@ -135,9 +135,8 @@ ssh arduino@<boardname>.local
 - Use the board name you chose in Step 2.
 - Type `yes` the first time, then enter the `arduino` password you set.
 
-If `.local` (mDNS) does not resolve — common on some corporate/router setups —
-connect once with ADB (Option B isn't needed if you have the IP; simply get the
-IP from the App Lab or router, or via `hostname -I` in an ADB session) and use:
+If `.local` (mDNS) does not resolve (common on some corporate or router setups),
+open an ADB shell (Option B), run `hostname -I` on the board to get its IP, then use:
 
 ```bash
 ssh arduino@<ip-address>
@@ -282,11 +281,14 @@ setting above.
 **Main install (4 GB board, ABX00173):**
 
 ```bash
-ollama run smollm2:1.7b
+ollama pull smollm2:1.7b
 ```
 
-- ~1.8 GB download (8K context). First run pulls it, then you get a chat
-  prompt — test it, e.g. `why do pumps fail?`, then `/bye` to quit.
+- ~1.8 GB download. Use `ollama pull` for setup: it is non-interactive and safe
+  over SSH. `ollama run <tag>` also pulls, but then opens a chat prompt; test it
+  with e.g. `why do pumps fail?` and quit with `/bye`.
+- **Model:** `smollm2:1.7b` is the only model used on the UNO Q (decided
+  2026-11-07).
 
 **Smaller variants** (all one tag swap, same command pattern `ollama run <tag>`):
 
@@ -307,7 +309,8 @@ ollama ps       # shows 100% CPU while a model is loaded (no GPU/NPU — expecte
 ```
 
 **Set expectations:** the QRB2210 (quad Cortex-A53) is an efficiency core.
-A ~1 B model runs at roughly 5–6 tokens/s; the 1.7 b SmolLM is slower.
+Speed is not measured in this project yet: expect the 1.7b model to be slow
+on this board (general estimates for ~1B models on this CPU are around 5 tokens/s).
 That is fine for this project — SmolLM here is an occasional analysis layer
 over pump telemetry, not a chatbot.
 
@@ -319,7 +322,7 @@ The service exposes an OpenAI-compatible endpoint on the board itself:
 http://127.0.0.1:11434
 ```
 
-Python on the MPU (App Lab app, M6 of `plan.md`) can POST to
+Python on the MPU (the pilot app, to-do M6) can POST to
 `http://127.0.0.1:11434/api/generate` or `/v1/chat/completions`. Quick test
 from the board shell:
 
@@ -336,7 +339,7 @@ curl http://localhost:11434/api/generate -d '{"model":"smollm2:1.7b","prompt":"H
 | Board never appears in App Lab | Wrong cable (charge-only) or Linux permission issue — check data cable first; on Linux confirm the udev rules and that you **logged out/in** after `usermod`. |
 | `adb devices` shows nothing | Wait up to 60 s; try another USB port/cable. |
 | `ssh: connect to host ...local port 22: ...` | mDNS blocked on your network — connect via ADB once, run `hostname -I` on the board, then `ssh arduino@<ip>`. |
-| `ssh` refused before first setup | SSH is enabled **by the App Lab wizard**; do Step 2 first, or enable via ADB: `arduino-app-cli system network-mode enable`. |
+| `ssh` refused before first setup | SSH is enabled **by the App Lab wizard**; do Step 2 first, or enable via ADB with `arduino-app-cli system network-mode enable` (check this command against current App Lab docs). |
 | Standard Ollama install failed / `No space left` on `/` | Remove leftovers: `sudo rm -rf /usr/local/lib/ollama`; then use Section 4 (installs into `/home/arduino`). |
 | `tar: zstd: Cannot exec` | Run `sudo apt install -y zstd` (4.2) and retry 4.3. |
 | `sudo: a password is required` | Enter the `arduino` password you set in the wizard; run the installer steps from an interactive shell, not a non-interactive session. |
@@ -344,7 +347,80 @@ curl http://localhost:11434/api/generate -d '{"model":"smollm2:1.7b","prompt":"H
 
 ---
 
-## Sources (verified Nov 2026)
+## 7. Pilot test on the board (replay, no sensors)
+
+Goal: run the pilot monitor and the web dashboard on the UNO Q with the
+fictional starter data. This does **not** use the logic-box UART link (not
+built yet) and does **not** need Ollama. Run every command from the repo
+root on the board unless marked as host.
+
+### 7.1 Check Python on the board
+
+```bash
+python3 --version     # must be 3.11 or newer (the code uses tomllib)
+```
+
+If it is older, stop and check with the other developer before installing anything.
+
+### 7.2 Copy the project (host)
+
+Commit your changes first: `git archive` packs the last commit only.
+
+```bash
+git archive --format=tar HEAD | ssh arduino@<board>.local 'mkdir -p ~/pump-sensor-project && tar -xf - -C ~/pump-sensor-project'
+scp data/starter/telemetry.csv.gz arduino@<board>.local:~/pump-sensor-project/data/starter/
+```
+
+`telemetry.csv.gz` is not in git (ignored by `.gitignore`), so copy it
+explicitly, as above.
+
+### 7.3 Install the pinned dependencies (board)
+
+```bash
+cd ~/pump-sensor-project
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+```
+
+If pip has to build pandas or scipy from source (no arm64 wheel for this
+Python), it can be slow or fail. Record the error and stop.
+
+### 7.4 Run the tests (board)
+
+```bash
+for f in tests/test_*.py; do .venv/bin/python "$f" || break; done
+```
+
+All seven files should print PASS. Record any failure.
+
+### 7.5 Run the pilot (board)
+
+```bash
+.venv/bin/python scripts/pilot_run.py --speed 0       # as fast as the board can go
+```
+
+`--speed N` replays N data-seconds per wall-second (for example `--speed 3600`
+is one hour of data per second). The run writes `pilot/state.json` and
+`pilot/predictions.jsonl`. Check with `cat pilot/state.json | head -40`.
+
+### 7.6 Serve the dashboard on the LAN (board, second SSH session)
+
+```bash
+.venv/bin/python scripts/web_ui.py --data data/starter --host 0.0.0.0 --port 8000
+```
+
+From a PC on the same network, open `http://<board>.local:8000`, or use the
+board's IP. The dashboard has **no authentication**: use it only on a trusted
+network. The pilot panel reads `pilot/state.json`, so the pilot can run in the
+first session while the dashboard runs in the second.
+
+### 7.7 Record the result
+
+Note these for the to-do: total wall time, `free -h` during the run, any
+errors, and whether the pilot panel shows the expected statuses. Stop
+services with Ctrl+C.
+
+## Sources (not re-checked during the Nov 2026 proofread; re-check before relying on them)
 
 - App Lab download & system requirements: arduino.cc/en/software (`#app-lab-section`)
 - Linux setup (libwebkit2gtk, udev rules, dialout): docs.arduino.cc/software/app-lab/setup/linux/
@@ -354,6 +430,6 @@ curl http://localhost:11434/api/generate -d '{"model":"smollm2:1.7b","prompt":"H
 - Ollama `/home` workaround for UNO Q: blog.tinivelli.com/installing-ollama-on-arduino-uno-q/
   (confirmed by projecthub.arduino.cc "Build Smarter with Claude Code & Ollama on UNO Q"
   and the UNO Q eMMC layout on forum.arduino.cc)
-- SmolLM2 tags/sizes: ollama.com/library/smollm2 (verified live: `1.7b` = 1.8 GB,
+- SmolLM2 tags/sizes: ollama.com/library/smollm2 (checked when written: `1.7b` = 1.8 GB,
   `1.7b-instruct-q4_K_M` = 1.1 GB, `360m-instruct-q4_K_M` = 271 MB,
   `135m-instruct-q4_K_M` = 105 MB; arm64 release asset = `tar.zst` only)
