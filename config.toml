@@ -65,3 +65,18 @@ motor_winding_temp_c = 140.0
 # the 10 s grid), and ESCALATED after escalate_samples (30 min). This
 # is the FAR-reduction surface (to-do M4: target < 2 %).
 confirm_samples = 18
+escalate_samples = 180escalate_samples = 180
+=======
+[web_ui]
+# Local dashboard defaults. Use --host 0.0.0.0 to expose it on the LAN.
+host = "127.0.0.1"
+port = 8000
+# Browser polling interval (seconds) and samples returned per chart window.
+refresh_seconds = 2
+history_samples = 240
+# |z| >= z_threshold * watch_fraction is shown as WATCH (below ALARM).
+watch_fraction = 0.5
+# Preferred chart channel; when it has no reading, the channel that best
+# explains the current status is shown instead.
+default_channel = "vibration_rms_mm_s"
+>>>>>>> Stashed changes
