@@ -2,8 +2,10 @@
 # Values derived from data/full. Do not hard-code these in Python files.
 
 [paths]
-# Root of the bundled test dataset.
+# Root of the bundled test dataset. Use "data/full" or "data/starter".
 data_dir = "data/full"
+# Available tiers for quick switching.
+tiers = ["full", "starter"]
 
 [assets]
 # All asset IDs found in data/full/assets.csv

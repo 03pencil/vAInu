@@ -35,6 +35,7 @@ Goals: readable, scalable, no hard-coding, minimal features, unified style.
 - Use pandas; never mutate input DataFrames in place unless documented.
 - Validate inputs at boundaries (data_input); trust inside modules.
 - Differentiate channels (pressure, temperature, vibration, flow) explicitly; no implicit coupling.
+- Support both data tiers via config (full/starter); never hard-code tier paths.
 
 ## Math / algorithms
 - Pure functions: input -> output, no side effects.

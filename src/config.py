@@ -35,3 +35,9 @@ def get_asset_ids(cfg: dict | None = None) -> list[str]:
     if cfg is None:
         cfg = load_config()
     return cfg.get("assets", {}).get("ids", [])
+
+
+def get_tiers(cfg: dict | None = None) -> list[str]:
+    if cfg is None:
+        cfg = load_config()
+    return cfg.get("paths", {}).get("tiers", ["full", "starter"])
