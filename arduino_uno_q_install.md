@@ -4,7 +4,7 @@
 > matching `bom.md` / `plan.md`. No cameras, bricks, monitor or case.
 > Covers the host PC setup on **Linux, Windows and macOS**, then the identical
 > board-side steps (they are the same for every host OS — only the host PC part
-> differs).
+> differs). ONLY LINUX TESTED, others researched
 
 **Note on the ordering code:** the 4 GB RAM / 32 GB eMMC board is **ABX00173**
 (not "AB00173"). The 2 GB / 16 GB variant is ABX00162 and can only run the
