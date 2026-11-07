@@ -36,3 +36,32 @@ z_threshold = 3.0
 # Smoothing window in samples for alarm decisions (10 s grid -> 60 = 10 min,
 # matching how the benchmark defines detectability).
 smoothing_window = 60
+
+[trend]
+# Layer 1 item 3: trailing-drift extrapolation -> time-to-limit.
+# Forecasts run on short-interval RUNNING-row medians (bin_minutes),
+# matching the benchmark detectability grid; the drift is fit over
+# trailing_hours and needs min_fit_points valid bins inside it.
+bin_minutes = 10
+trailing_hours = 12.0
+# A bin is valid when it holds at least min_bin_count samples inside the
+# trailing window at least min_fit_points bins must hold data (T1
+# sparse wireless channels update every 300 s -> few samples per bin).
+min_bin_count = 2
+min_fit_points = 36
+
+[limits]
+# Static alarm limits for channels that have no limit column in
+# assets.csv (values from simulation_assumptions.md: bearing caution
+# band 82 C / alarm 85 C; winding class-F alarm 140 C). Vibration
+# limits come from assets.csv (vibration_alarm_mm_s) instead.
+bearing_temp_c = 85.0
+motor_winding_temp_c = 140.0
+
+[debounce]
+# Alarm-burst debouncing: a raw z alarm becomes CONFIRMED only after it
+# held for confirm_samples consecutive rows inside one asset (3 min on
+# the 10 s grid), and ESCALATED after escalate_samples (30 min). This
+# is the FAR-reduction surface (to-do M4: target < 2 %).
+confirm_samples = 18
+escalate_samples = 180

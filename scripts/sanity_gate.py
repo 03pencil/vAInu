@@ -28,8 +28,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import pandas as pd
 
-from src.config import get_smoothing_window, get_z_threshold
+from src.config import (
+    get_debounce_config,
+    get_smoothing_window,
+    get_z_threshold,
+)
 from src.data_input import channel_columns, load_assets, load_telemetry
+from src.debounce import confirmed_mask
 from src.labels import (
     FAULT_LABELS,
     LABEL_BENIGN,
@@ -82,11 +87,20 @@ def evaluate() -> None:
     surface[alarmed_env] = "envelope"
     surface[alarmed_roll & ~alarmed_env] = "rolling"
 
+    # Debounced surface: an alarm must hold for confirm_samples rows
+    # inside one asset before it counts (FAR-reduction, to-do M4).
+    confirm = int(get_debounce_config()["confirm_samples"])
+    confirmed = (
+        confirmed_mask(alarmed_env, df["asset_id"], confirm)
+        | confirmed_mask(alarmed_roll, df["asset_id"], confirm)
+    )
+
     # --- KPI 1: false-alarm rate on confirmed-benign rows -------------
     benign_rows = df["label"] == LABEL_BENIGN
     n_benign = int(benign_rows.sum())
     for name, mask in (("envelope+rolling", alarmed), ("envelope only", alarmed_env),
-                       ("rolling only", alarmed_roll)):
+                       ("rolling only", alarmed_roll),
+                       (f"debounced (confirmed >= {confirm} rows)", confirmed)):
         hits = int((mask & benign_rows).sum())
         print(f"KPI 1  benign false-alarm rate [{name}]: {hits / max(n_benign, 1):.1%} "
               f"({hits:,} of {n_benign:,} benign rows)")
