@@ -154,13 +154,24 @@ Recorded so later layers can be compared against them:
 - [x] `requirements.txt` with pinned pandas / numpy / scipy (runtime).
 - [x] Proofread `arduino_uno_q_install.md`; added section 7 (pilot test on
   the board).
-- [ ] Bench test on the UNO Q per `arduino_uno_q_install.md` section 7
-  (Python 3.11+ check, copy project + telemetry, venv, tests, pilot, LAN
-  dashboard). Record wall time, RAM, errors.
+- [x] Bench test on the UNO Q per `arduino_uno_q_install.md` section 7, step 1
+  (no LLM) — 2026-11-07. Board `picool` (10.20.3.13), Python 3.13.5,
+  3.6 GB RAM. Installed pinned requirements (pandas 3.1.1, numpy 2.5.4,
+  scipy 1.18.1, pyarrow 26.0.1). All 38 tests pass on the board. Pilot
+  replay: 1 min 43 s wall time, ~560 MB used, same results as the host run.
+  Dashboard served on LAN at port 8000 and reachable from the PC.
+  Issues found:
+  - `config.toml` `data_dir` is `data/full`, which has no telemetry in this
+    repo; the board test used `data/starter` through a board-only edit (not
+    committed). Decide the default tier with the team.
+  - Dashboard was first started in the foreground of an SSH session and
+    stopped when the session closed; restarted with `nohup`.
+  - PUMP-03, -04, -08 are still `unknown` after the envelope-fallback commit
+    `946a8ea`.
 - [x] Decide the SmolLM tag for the UNO Q: `smollm2:1.7b` (better structured
   output; fits the 4 GB board). `plan.md` / `skill_data.md` still name
   `smollm2:135m` for the host chain; update them when the SmolLM layer lands.
-- [ ] Board test step 1: pilot + web UI without LLM (manual section 7).
+- [x] Board test step 1: pilot + web UI without LLM (manual section 7), 2026-11-07.
 - [ ] Board test step 2: SmolLM layer on the board (Ollama install per manual
   sections 4–5, serializer, alarm-triggered call, JSON validation, fallback).
 - [x] First local web UI prototype (`scripts/web_ui.py`, `src/web_ui.py`):
