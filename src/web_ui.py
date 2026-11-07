@@ -376,6 +376,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
     server_version = "vAInuUI/0.1"
     data: DashboardData
     web_config: dict[str, Any]
+    pilot_state_path: Path | None = None
     verbose = False
 
     def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
@@ -383,6 +384,8 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         try:
             if parsed.path in ("/", "/index.html"):
                 self._send_html(HTML_PAGE)
+            elif parsed.path == "/api/pilot":
+                self._send_json(self._pilot_payload())
             elif parsed.path == "/api/config":
                 self._send_json({
                     "refresh_seconds": self.web_config["refresh_seconds"],
@@ -414,6 +417,17 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             pass
         except Exception as exc:  # noqa: BLE001 - report server errors as JSON
             self._send_json({"error": f"{type(exc).__name__}: {exc}"}, status=500)
+
+    def _pilot_payload(self) -> dict[str, Any]:
+        """Latest pilot snapshot written by scripts/pilot_run.py (read per request)."""
+        empty = {"generated_utc": None, "assets": []}
+        path = self.pilot_state_path
+        if path is None or not path.is_file():
+            return {**empty, "warning": "No pilot state yet. Run scripts/pilot_run.py."}
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return {**empty, "warning": "Pilot state is being written; retry shortly."}
 
     @staticmethod
     def _optional_int(query: dict[str, list[str]], name: str) -> int | None:
@@ -466,6 +480,7 @@ def serve(
     refresh_seconds: float = 2.0,
     history_samples: int = 240,
     verbose: bool = False,
+    pilot_state_path: "Path | None" = None,
 ) -> None:
     """Start the dashboard server (blocking)."""
     handler = type(
@@ -477,6 +492,7 @@ def serve(
                 "refresh_seconds": refresh_seconds,
                 "history_samples": history_samples,
             },
+            "pilot_state_path": pilot_state_path,
             "verbose": verbose,
         },
     )
@@ -631,6 +647,9 @@ h2 { margin: 0; font-size: 15px; font-weight: 600; }
 .value-main { font-size: 16px; font-weight: 600; margin-top: 4px; }
 .value-z { color: var(--muted); font-size: 11px; margin-top: 3px; }
 .deviations { display: flex; flex-direction: column; gap: 8px; }
+.pilot-table table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.pilot-table th, .pilot-table td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+.pilot-table th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; }
 .deviation {
   display: flex;
   align-items: center;
@@ -732,6 +751,14 @@ h2 { margin: 0; font-size: 15px; font-weight: 600; }
         <div class="hint">Robust modified z-score; alarm threshold <span id="threshold-label">-</span>.</div>
       </section>
     </div>
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Pilot monitor (replay)</h2>
+        <span id="pilot-meta" class="muted small"></span>
+      </div>
+      <div id="pilot-table" class="pilot-table"></div>
+      <div class="hint">Causal replay of fictional data; advisory only. Fault type stays UNKNOWN until the classifier exists.</div>
+    </section>
     <footer class="foot">Prototype: deterministic robust z-score alarm, not a fault diagnosis. SmolLM narration is not wired yet.</footer>
   </main>
 </div>
@@ -819,6 +846,33 @@ async function loadConfig() {
   $("threshold-label").textContent = Number(state.config.z_threshold).toFixed(1) + "s";
   state.window = state.config.history_samples || state.window;
   $("window-select").value = String(state.window);
+}
+
+async function loadPilot() {
+  try {
+    const payload = await api("/api/pilot");
+    const assets = payload.assets || [];
+    $("pilot-meta").textContent = payload.generated_utc
+      ? "data time " + formatTime(payload.generated_utc)
+      : (payload.warning || "");
+    if (!assets.length) {
+      $("pilot-table").innerHTML = '<div class="muted">No pilot records yet.</div>';
+      return;
+    }
+    const rows = assets.map((asset) =>
+      "<tr><td>" + escapeHtml(asset.asset_id) + "</td>" +
+      '<td><span class="status ' + statusClass(asset.status) + '">' + escapeHtml(String(asset.status).toUpperCase()) + "</span></td>" +
+      "<td>" + escapeHtml(asset.debounce_state || "-") + "</td>" +
+      "<td>" + formatZ(asset.score_z) + "</td>" +
+      "<td>" + escapeHtml(asset.top_channel || "-") + "</td>" +
+      "<td>" + escapeHtml(asset.recommended_action || "-") + "</td></tr>"
+    ).join("");
+    $("pilot-table").innerHTML =
+      "<table><thead><tr><th>Asset</th><th>Status</th><th>Debounce</th><th>Score</th>" +
+      "<th>Top channel</th><th>Recommended action</th></tr></thead><tbody>" + rows + "</tbody></table>";
+  } catch (error) {
+    $("pilot-meta").textContent = "Pilot state unavailable: " + error.message;
+  }
 }
 
 async function loadOverview() {
@@ -1025,6 +1079,7 @@ function updatePlayButton() {
 async function tick() {
   try {
     await loadOverview();
+    await loadPilot();
     if (state.playing && state.asset) {
       const next = Math.min(state.cursor + state.speed, state.asset.total - 1);
       state.cursor = next;
@@ -1046,6 +1101,7 @@ async function init() {
   try {
     await loadConfig();
     await loadOverview();
+    await loadPilot();
     if (state.overview.length) await selectAsset(state.overview[0].asset_id);
     $("conn").textContent = "Connected";
     const seconds = state.config.refresh_seconds || 2;
