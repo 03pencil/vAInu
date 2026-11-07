@@ -2,7 +2,7 @@
 
 vAInu helps spot pump problems early. It reads sensor data, looks for signs that something may be going wrong, and shows warnings on a local web dashboard. The analysis runs on an Arduino UNO Q.
 
-Built for the **SinceAI 2026 Hackathon** in Turku.
+Built for the **SinceAI 2026 Hackathon** in Turku. Fully fictional.
 
 ## What it does
 
@@ -34,7 +34,7 @@ python3 -m venv .venv
 
 # Replay the starter data through the pilot monitor
 .venv/bin/python scripts/pilot_run.py --data data/starter --speed 0
-
+```
 ## Web UI (first version)
 
 A dependency-free local dashboard shows the current alarm surface over the
@@ -44,7 +44,7 @@ bundled telemetry:
 python scripts/web_ui.py --data data/full
 ```
 
-Open <http://127.0.0.1:8000>. Use `--host 0.0.0.0` to expose it on the local
+Open <http://<arduino_ip>:8000>. Use `--host 0.0.0.0` to expose it on the local
 network (the prototype has no authentication, so trusted LANs only).
 
 The first version includes:
@@ -59,11 +59,7 @@ The first build scores every asset in parallel processes (one per logical CPU
 by default) and writes the finished alarm surface to `cache/web_ui`, so a
 restart skips the rebuild:
 
-```bash
-python scripts/web_ui.py --data data/full --workers 8    # cap the process count
-python scripts/web_ui.py --data data/full --rebuild      # ignore the cache
-python scripts/web_ui.py --data data/full --cache-dir "" # disable the cache
-```
+
 
 `[compute] workers` in `config.toml` sets the default (`0` = auto), and
 `[web_ui] cache_dir` sets where the surface is stored.
@@ -74,19 +70,6 @@ python scripts/web_ui.py --data data/full --cache-dir "" # disable the cache
 > bundle. The dashboard uses the same robust
 > envelope math as `scripts/sanity_gate.py`. SmolLM narration is a separate
 > batch step: `scripts/narrate.py` (see `[llm]` in `config.toml`).
-
-## Tech Stack
-# Start the dashboard, then open http://127.0.0.1:8000
-.venv/bin/python scripts/web_ui.py --data data/starter
-```
-
-Run the tests with:
-
-```bash
-for f in tests/test_*.py; do .venv/bin/python "$f" || break; done
-```
-
-> `config.toml` points at `data/full` by default, but this repo does not include its telemetry files. Use `--data data/starter` until a full copy is available.
 
 ## Documentation
 
@@ -113,7 +96,7 @@ for f in tests/test_*.py; do .venv/bin/python "$f" || break; done
 
 ## Limitations
 
-- The data is synthetic. There is no field evidence yet.
+- The data is synthetic. There is no field evidence.
 - The dashboard has no login. Run it only on a trusted network.
 - SmolLM narration runs as a batch job and is off by default (`[llm] enabled = false`). Its text is checked, but it is still advisory.
 
@@ -127,4 +110,4 @@ Project code is MIT, see [`LICENSE`](LICENSE). The original dataset is © Since 
 
 Thanks to **Major League Hacking** for providing the Arduino UNO Q.
 
-Development used [OpenCode](https://opencode.ai) with Claude Haiku 5.5.
+Development used [OpenCode](https://opencode.ai) with Claude Haiku 5.5, DeepSeek 4.1 flash.
