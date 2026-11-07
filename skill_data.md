@@ -27,6 +27,6 @@ When working with this data:
 - Use data_dictionary.csv as the source of truth for columns/units.
 - Baseline predictions exist for comparison; submission format in submission_template.
 
-## Local models (this machine)
+## Local models
 
-- Model: smollm2:1.7b via Ollama (the only LLM in the plan; mistral and gemma4 were removed). Run with `.venv/bin/python` for data libs.
+- Model: smollm2:1.7b via Ollama (the only LLM in the plan). Run Python with `.venv/bin/python`.

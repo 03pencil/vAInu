@@ -360,7 +360,7 @@ root on the board unless marked as host.
 python3 --version     # must be 3.11 or newer (the code uses tomllib)
 ```
 
-If it is older, stop and tell the team before installing anything.
+If it is older, stop and check with the other developer before installing anything.
 
 ### 7.2 Copy the project (host)
 
