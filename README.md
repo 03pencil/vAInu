@@ -1,99 +1,90 @@
 # vAInu — Pump Sensor Project
 
-> Edge AI for predictive pump maintenance, running on an Arduino UNO Q.
+vAInu watches pump sensors and warns about developing faults before they cause a stop. It runs on an Arduino UNO Q, a small board with a Linux processor and a microcontroller.
 
 Built for the **SinceAI 2026 Hackathon** in Turku.
 
-**Main objective:** build the prediction algorithm that SmolLM uses to analyse pump telemetry and forecast faults.
+## What it does
 
-**Scope:** designed to be widely retrofit-compatible — usable across a wide selection of pumps and motors in both maritime and industrial environments. Operates in **maintenance prediction mode**, forecasting faults before they occur.
+- Reads pump telemetry (pressure, flow, temperature, vibration, and more).
+- Compares it with what "healthy" looks like for that pump and its operating mode.
+- Raises early warnings and estimates how long until a limit is reached.
+- Explains each warning in plain language (SmolLM, planned).
 
-## Overview
+vAInu is **advisory only**. It never controls the pump and never writes to hardware. A person always makes the decision.
 
-Pump sensors stream telemetry to a logic box, which forwards it to an **Arduino UNO Q**. The UNO Q's MPU runs a **SmolLM** model locally, analysing the data and serving results to a minimal web UI on the local network. The Arduino only receives data from the pump logic circuit and outputs results elsewhere — it has no other inbound connections.
+## How it fits together
 
 ```mermaid
 flowchart LR
-    A[Pump Sensors] --> B[Logic Box]
-    B --> C[Arduino UNO Q MCU]
-    C --> D[MPU / SmolLM inference]
-    D --> E[Analysed Data]
-    D --> F[Minimal Web UI]
+    A[Pump sensors] --> B[Logic box]
+    B --> C[Arduino UNO Q]
+    C --> D[Analysis and SmolLM]
+    D --> E[Web dashboard on the local network]
 ```
 
-See [`plan.md`](plan.md) for the full architecture and roadmap, and [`to-do.md`](to-do.md) for the task breakdown.
+The UNO Q receives data from the logic box over a single serial link. It has no other inbound connections.
 
-## Architecture
+## Quick start
 
-- 📡 Pump sensors → logic box (collect/forward telemetry)
-- 🔗 Logic box → Arduino UNO Q (single inbound data path; MCU receives, MPU runs LLM inference)
-- 🖥️ Arduino UNO Q → minimal web UI (live values + predictions, local network only)
-
-## Repository Structure
-
-- `config.toml` — all project settings (paths, tiers, assets, channels, analysis).
-- `main.py` — entry point; orchestrates the modules in `src/`.
-- `src/` — library code:
-  - `data_input.py` — load and split telemetry (+ asset nameplate joins, quality-flag helpers).
-  - `labels.py` — aligns event / benign-window labels onto telemetry rows.
-  - `math.py` — robust statistics, modified z-scores, group-aware rolling helpers.
-  - `physics.py` — pump-curve, flow, efficiency and thermal residual features.
-  - `web_ui.py` — first-version local dashboard (stdlib HTTP server + JSON API, pilot panel).
-  - `feed.py` — telemetry sources: replay (now) and UART frame parser (stub for the logic box).
-  - `pilot.py` — streaming, causal pilot monitor; writes `pilot/state.json`.
-  - `ui.py` — matplotlib plotting helpers.
-  - `config.py` — reads `config.toml`.
-- `scripts/` — runnable pipelines:
-  - `sanity_gate.py` — baseline KPI gate: benign false-alarm rate + early-warning lead time vs the benchmark's own detection clock.
-  - `web_ui.py` — serves the local dashboard (asset status, latest values, channel chart, replay).
-  - `pilot_run.py` — replays telemetry through the pilot monitor and writes `pilot/state.json` and `pilot/predictions.jsonl`.
-- `requirements.txt` — pinned runtime dependencies (pandas, numpy, scipy).
-- `arduino_uno_q_install.md` — UNO Q setup, Ollama/SmolLM install, and the board pilot test (section 7).
-- `tests/` — plain-assert test scripts (run with `.venv/bin/python tests/test_*.py`).
-- `data/` — pump telemetry dataset (`full/` + `starter/`). **Read-only**; the only data source.
-- `skills/` — coding and data guidelines for humans and LLMs.
-- `skill_data.md` — notes about the dataset and its handling.
-- `plan.md` / `to-do.md` / [`bom.md`](bom.md) — roadmap, task breakdown, and minimal hardware BOM.
-
-## Web UI (first version)
-
-A dependency-free local dashboard shows the current alarm surface over the
-bundled telemetry:
+You need Python 3.11 or newer.
 
 ```bash
-python scripts/web_ui.py --data data/full
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+
+# Replay the starter data through the pilot monitor
+.venv/bin/python scripts/pilot_run.py --data data/starter --speed 0
+
+# Start the dashboard, then open http://127.0.0.1:8000
+.venv/bin/python scripts/web_ui.py --data data/starter
 ```
 
-Open <http://127.0.0.1:8000>. Use `--host 0.0.0.0` to expose it on the local
-network (the prototype has no authentication, so trusted LANs only).
+Run the tests with:
 
-The first version includes:
+```bash
+for f in tests/test_*.py; do .venv/bin/python "$f" || break; done
+```
 
-- asset list with `OK` / `WATCH` / `ALARM` / `IDLE` status,
-- latest values and robust modified z-scores per channel,
-- top deviating channels at the selected sample,
-- a channel chart with alarm bands, window selector, and replay controls.
+> `config.toml` points at `data/full` by default, but this repo does not include its telemetry files. Use `--data data/starter` until a full copy is available.
 
-> The full tier needs its telemetry parquet partitions
-> (`data/full/telemetry/`), which are excluded by `.gitignore`. If they are
-> missing from the checkout, point `--data` at the original participant
-> bundle. The dashboard uses the same robust
-> envelope math as `scripts/sanity_gate.py`; SmolLM narration is not wired yet.
+## Documentation
 
-## Tech Stack
+| File | What it covers |
+|---|---|
+| [`plan.md`](plan.md) | Goal, approach, phases, and current status |
+| [`to-do.md`](to-do.md) | Open tasks, grouped by area |
+| [`Workflow.md`](Workflow.md) | Reaching the board and running the dashboard |
+| [`arduino_uno_q_install.md`](arduino_uno_q_install.md) | Board setup, Ollama and SmolLM install, board test |
+| [`bom.md`](bom.md) | Hardware list |
+| [`skill_data.md`](skill_data.md) | Rules for working with the dataset |
+| [`skills/python-style.md`](skills/python-style.md) | Python coding style |
 
-- Python / MicroPython, PEP 8, simple but effective.
-- `pandas`, `numpy`, `scipy`, `matplotlib`.
-- SmolLM (GGUF via llama.cpp) running on the UNO Q MPU.
+## Repository layout
+
+- `config.toml` — all project settings.
+- `main.py` — entry point.
+- `src/` — library modules (data loading, labels, math, physics, pilot monitor, web UI).
+- `scripts/` — runnable pipelines (pilot replay, dashboard, KPI gate).
+- `tests/` — test scripts.
+- `data/` — pump telemetry dataset. Read-only.
+- `pilot/` — generated output (not tracked by git).
+- `skills/` — coding and data guidelines.
+
+## Limitations
+
+- The data is synthetic. There is no field evidence yet.
+- The dashboard has no login. Run it only on a trusted network.
+- SmolLM narration is not connected to the dashboard yet.
+
+## Team and license
+
+Developed by Paavo Gaidach and Matias Hirvonen.
+
+Project code is MIT, see [`LICENSE`](LICENSE). The original dataset is © Since AI ry, licensed under CC BY 4.0.
 
 ## Acknowledgements
 
-🙏 Special thanks to **Majos Hacking League** for providing the **Arduino UNO Q** used in this project.
+Thanks to **Majos Hacking League** for providing the Arduino UNO Q.
 
-## Built with
-
-Development used [OpenCode](https://opencode.ai) with **Claude Haiku 5.5** (free tier, `beam free`).
-
-## License
-
-See [`LICENSE`](LICENSE). Project code is MIT (© 2026 P. Gaidach & M. Hirvonen). Original dataset © Since AI ry, CC BY 4.0.
+Development used [OpenCode](https://opencode.ai) with Claude Haiku 5.5.
