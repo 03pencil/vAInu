@@ -1,8 +1,22 @@
+# vAInu project configuration (stdlib tomllib, Python 3.11+).
+# Values derived from data/full. Do not hard-code these in Python files.
+
 [paths]
+# Root of the bundled test dataset.
 data_dir = "data/full"
 
+[assets]
+# All asset IDs found in data/full/assets.csv
+ids = [
+  "PUMP-01", "PUMP-02", "PUMP-03", "PUMP-04",
+  "PUMP-05", "PUMP-06", "PUMP-07", "PUMP-08",
+  "PUMP-09", "PUMP-10", "PUMP-11", "PUMP-12",
+]
+
 [channels]
+# Sensor channels analysed by the pipeline.
 names = ["pressure", "temperature", "vibration", "flow"]
 
 [analysis]
+# Window size for rolling statistics.
 rolling_window = 5
