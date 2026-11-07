@@ -93,3 +93,21 @@ default_channel = "vibration_rms_mm_s"
 # Finished alarm surface kept on disk so a restart skips the rebuild.
 # Relative paths resolve from the repository root; "" disables the cache.
 cache_dir = "cache/web_ui"
+
+[llm]
+# Batch narration (scripts/narrate.py): SmolLM explains pilot alarms in plain
+# language. It never changes status, numbers or data. Off by default: with
+# enabled = false the script writes template text only.
+enabled = false
+# Ollama on the board (or a local PC for testing).
+base_url = "http://127.0.0.1:11434"
+model = "smollm2:1.7b"
+# Seconds per request. A 1.7B model on the UNO Q runs at roughly 5 tokens/s.
+timeout_seconds = 180
+max_tokens = 256
+# Extra attempts after an answer fails validation; each retry lists the broken rules.
+retries = 2
+# Most records narrated per run, most severe first.
+max_records_per_run = 20
+# Window for the "alarm entries" count shown to the model.
+history_hours = 24

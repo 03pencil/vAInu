@@ -42,6 +42,7 @@ from .labels import (
     load_events,
 )
 from .math import group_rolled, merged_stats, modified_zscores, rolling_robust_z
+from .narration import read_latest_narrations
 
 MAX_WINDOW = 5000
 STATUS_OK = "OK"
@@ -632,6 +633,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
     data: DashboardData
     web_config: dict[str, Any]
     pilot_state_path: Path | None = None
+    analysis_path: Path | None = None
     verbose = False
 
     def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
@@ -641,6 +643,8 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 self._send_html(HTML_PAGE)
             elif parsed.path == "/api/pilot":
                 self._send_json(self._pilot_payload())
+            elif parsed.path == "/api/narration":
+                self._send_json(read_latest_narrations(self.analysis_path))
             elif parsed.path == "/api/config":
                 self._send_json({
                     "refresh_seconds": self.web_config["refresh_seconds"],
@@ -743,6 +747,7 @@ def serve(
     window_intervals: "list[int] | None" = None,
     verbose: bool = False,
     pilot_state_path: "Path | None" = None,
+    analysis_path: "Path | None" = None,
 ) -> None:
     """Start the dashboard server (blocking)."""
     handler = type(
@@ -757,6 +762,7 @@ def serve(
                     window_intervals or DEFAULT_WINDOW_INTERVALS),
             },
             "pilot_state_path": pilot_state_path,
+            "analysis_path": analysis_path,
             "verbose": verbose,
         },
     )
@@ -914,6 +920,13 @@ h2 { margin: 0; font-size: 15px; font-weight: 600; }
 .pilot-table table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .pilot-table th, .pilot-table td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); }
 .pilot-table th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; }
+.narr-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; }
+.narr-card { background: var(--panel-2); border: 1px solid var(--line); border-radius: 9px; padding: 10px 12px; font-size: 13px; }
+.narr-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.narr-source { color: var(--muted); font-size: 11px; }
+.narr-summary { margin: 0 0 6px; }
+.narr-card ul { margin: 0 0 6px; padding-left: 18px; }
+.narr-uncertain { color: var(--muted); font-size: 12px; }
 .deviation {
   display: flex;
   align-items: center;
@@ -1018,7 +1031,15 @@ h2 { margin: 0; font-size: 15px; font-weight: 600; }
       <div id="pilot-table" class="pilot-table"></div>
       <div class="hint">Causal replay of fictional data; advisory only. Fault type stays UNKNOWN until the classifier exists.</div>
     </section>
-    <footer class="foot">Prototype: deterministic robust z-score alarm, not a fault diagnosis. SmolLM narration is not wired yet.</footer>
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Narration (batch)</h2>
+        <span id="narr-meta" class="muted small"></span>
+      </div>
+      <div id="narr-list" class="narr-list"></div>
+      <div class="hint">Written by scripts/narrate.py from the pilot record and past history. Explains only; it does not change any status.</div>
+    </section>
+    <footer class="foot">Prototype: deterministic robust z-score alarm, not a fault diagnosis. Narration is an advisory text summary.</footer>
   </main>
 </div>
 <script>
@@ -1149,6 +1170,37 @@ async function loadPilot() {
       "<th>Top channel</th><th>Recommended action</th></tr></thead><tbody>" + rows + "</tbody></table>";
   } catch (error) {
     $("pilot-meta").textContent = "Pilot state unavailable: " + error.message;
+  }
+}
+
+function narrationCard(item) {
+  const source = item.source === "llm"
+    ? "SmolLM, checked against the record (" + escapeHtml(item.model || "") + ")"
+    : "Template text from the record";
+  const checks = (item.what_to_check || []).map((text) => "<li>" + escapeHtml(text) + "</li>").join("");
+  return '<div class="narr-card">' +
+    '<div class="narr-head"><span><strong>' + escapeHtml(item.asset_id) + "</strong> " +
+      '<span class="status ' + statusClass(item.status) + '">' + escapeHtml(String(item.status).toUpperCase()) + "</span></span>" +
+      '<span class="narr-source">' + escapeHtml(formatTime(item.timestamp_utc)) + "</span></div>" +
+    '<div class="narr-source">' + source + "</div>" +
+    '<p class="narr-summary">' + escapeHtml(item.summary) + "</p>" +
+    (checks ? "<ul>" + checks + "</ul>" : "") +
+    '<div class="narr-uncertain">' + escapeHtml(item.uncertainty || "") + "</div>" +
+  "</div>";
+}
+
+async function loadNarration() {
+  try {
+    const payload = await api("/api/narration");
+    const items = payload.items || [];
+    $("narr-meta").textContent = payload.generated_utc
+      ? "written " + formatTime(payload.generated_utc)
+      : (payload.warning || "");
+    $("narr-list").innerHTML = items.length
+      ? items.map(narrationCard).join("")
+      : '<div class="muted">No narrations yet. Run scripts/narrate.py.</div>';
+  } catch (error) {
+    $("narr-meta").textContent = "Narration unavailable: " + error.message;
   }
 }
 
@@ -1356,6 +1408,7 @@ async function tick() {
   try {
     await loadOverview();
     await loadPilot();
+    await loadNarration();
     if (state.playing && state.asset) {
       const next = Math.min(state.cursor + state.speed, state.asset.total - 1);
       state.cursor = next;
@@ -1378,6 +1431,7 @@ async function init() {
     await loadConfig();
     await loadOverview();
     await loadPilot();
+    await loadNarration();
     if (state.overview.length) await selectAsset(state.overview[0].asset_id);
     $("conn").textContent = "Connected";
     const seconds = state.config.refresh_seconds || 2;

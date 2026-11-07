@@ -115,6 +115,27 @@ def get_web_ui_config(cfg: dict | None = None) -> dict:
     return values
 
 
+_LLM_DEFAULTS = {
+    "enabled": False,
+    "base_url": "http://127.0.0.1:11434",
+    "model": "smollm2:1.7b",
+    "timeout_seconds": 180,
+    "max_tokens": 256,
+    "retries": 2,
+    "max_records_per_run": 20,
+    "history_hours": 24,
+}
+
+
+def get_llm_config(cfg: dict | None = None) -> dict:
+    """[llm] section (batch narration), with defaults for missing keys."""
+    if cfg is None:
+        cfg = load_config()
+    values = dict(_LLM_DEFAULTS)
+    values.update(cfg.get("llm", {}))
+    return values
+
+
 def get_worker_count(cfg: dict | None = None) -> int:
     """Worker processes for [compute] steps.
 

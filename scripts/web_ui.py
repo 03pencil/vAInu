@@ -52,6 +52,10 @@ def parse_args() -> argparse.Namespace:
         "--pilot-state", default=str(ROOT / "pilot" / "state.json"),
         help="Pilot snapshot written by scripts/pilot_run.py (shown in the pilot panel).",
     )
+    parser.add_argument(
+        "--analysis", default=str(ROOT / "pilot" / "analysis.jsonl"),
+        help="Narration file written by scripts/narrate.py (shown in the narration panel).",
+    )
     parser.add_argument("--verbose", action="store_true", help="Log every HTTP request.")
     return parser.parse_args()
 
@@ -102,6 +106,7 @@ def main() -> None:
         window_intervals=web_config["window_intervals"],
         verbose=args.verbose,
         pilot_state_path=Path(args.pilot_state),
+        analysis_path=Path(args.analysis),
     )
 
 

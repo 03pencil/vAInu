@@ -26,11 +26,11 @@
 - [ ] Precision, recall, and F1 once a classifier exists.
 
 ### SmolLM narration
-- [ ] Situation-report serializer (fixed text from the pilot record).
-- [ ] `scripts/narrate.py`: one SmolLM call per alarm, saved to `pilot/analysis.jsonl`.
-- [ ] Validator: reject non-JSON, numbers that are not in the input, and labels outside the taxonomy.
-- [ ] `[llm]` config section, off by default, with stub-server tests.
-- [ ] Narration panel in the web UI.
+- [x] Situation-report serializer (fixed text from the pilot record, plus causal history).
+- [x] `scripts/narrate.py`: one SmolLM call per alarm, saved to `pilot/analysis.jsonl`.
+- [x] Validator: reject non-JSON, numbers that are not in the input, labels outside the taxonomy, status mismatch, and unsafe wording.
+- [x] `[llm]` config section, off by default, with stub-server tests.
+- [x] Narration panel in the web UI.
 - [ ] Later: measured fault-type choice against `events_train.csv`.
 - [ ] Later: use `maintenance.csv` operator notes.
 
