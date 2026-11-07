@@ -33,6 +33,10 @@ def load_config(path: str = CONFIG_FILE) -> dict:
 
 
 def get_data_dir(cfg: dict | None = None) -> str:
+    """Tier directory: VAINU_DATA_DIR if set, else [paths] data_dir."""
+    override = os.environ.get("VAINU_DATA_DIR", "").strip()
+    if override:
+        return override
     if cfg is None:
         cfg = load_config()
     return cfg.get("paths", {}).get("data_dir", "data/full")

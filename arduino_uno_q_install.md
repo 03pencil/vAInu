@@ -354,6 +354,16 @@ fictional starter data. This does **not** use the logic-box UART link (not
 built yet) and does **not** need Ollama. Run every command from the repo
 root on the board unless marked as host.
 
+**Shortcut:** the steps below are wrapped in `scripts/run_board.sh`:
+
+```bash
+scripts/run_board.sh check       # Python, telemetry, Ollama and [llm] status
+scripts/run_board.sh all         # setup, tests, pilot, narration, dashboard
+scripts/run_board.sh dashboard   # just serve the dashboard (port 8000)
+```
+
+Run `scripts/run_board.sh --help` for the other commands and options.
+
 ### 7.1 Check Python on the board
 
 ```bash
