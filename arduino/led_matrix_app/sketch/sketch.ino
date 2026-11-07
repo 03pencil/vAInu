@@ -1,4 +1,5 @@
 #include <Arduino_RouterBridge.h>
+#include <ArduinoGraphics.h>
 #include <Arduino_LED_Matrix.h>
 
 // Receives one frame from Python (scripts/led_matrix.py) as 104 characters
