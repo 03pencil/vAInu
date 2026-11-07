@@ -5,3 +5,5 @@
 pandas==3.1.1
 numpy==2.5.4
 scipy==1.18.1
+# Reads the full tier's parquet telemetry partitions (src/data_input.py).
+pyarrow==26.0.1
