@@ -8,7 +8,7 @@ Pump sensors send telemetry to a logic box, which delivers it to an Arduino UNO 
 
 - Pump sensors -> logic box (collect/forward telemetry).
 - Logic box -> Arduino UNO Q (single inbound data path; MCU receives, MPU runs LLM inference).
-- Arduino UNO Q -> output sink (analysed data only; no inbound from elsewhere).
+- Arduino UNO Q -> minimal web UI (served by MPU, local network) showing live values + predictions; no inbound from elsewhere.
 
 ## Phases
 
@@ -25,4 +25,4 @@ Pump sensors send telemetry to a logic box, which delivers it to an Arduino UNO 
 - M1: Data exploration notebook/script done.
 - M2: Baseline model metrics on validation.
 - M3: App Lab app running on UNO Q (receive -> infer -> output).
-- M4: End-to-end demo: pumps -> logic box -> UNO Q -> analysed output.
+- M4: End-to-end demo: pumps -> logic box -> UNO Q -> minimal web UI.
