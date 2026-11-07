@@ -29,7 +29,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import pandas as pd
 
 from src.config import get_smoothing_window, get_z_threshold
-from src.data_input import channel_columns, load_telemetry
+from src.data_input import channel_columns, load_assets, load_telemetry
 from src.labels import (
     FAULT_LABELS,
     LABEL_BENIGN,
@@ -38,6 +38,7 @@ from src.labels import (
     label_telemetry,
 )
 from src.math import group_rolled, merged_stats, modified_zscores, rolling_robust_z
+from src.physics import PHYSICS_FEATURES, add_physics_features
 
 
 def z_cols_of(channels: "list[str]") -> list[str]:
@@ -53,7 +54,10 @@ def evaluate() -> None:
     events = load_events()
     benign = load_benign_windows()
     df = label_telemetry(df, events, benign)
-    channels = channel_columns(df)
+    # Layer 1 item 2: physics residuals as extra scoring channels; their
+    # evidence may light up before any raw channel does.
+    df = add_physics_features(df, load_assets())
+    channels = channel_columns(df) + [c for c in PHYSICS_FEATURES if c in df.columns]
 
     # Envelope from everything that is not a labeled fault; profile-level
     # fallback fills gaps for heavily fault-labeled assets.

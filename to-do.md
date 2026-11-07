@@ -84,9 +84,17 @@
 - [x] Self-adaptive trailing z as second detection surface
   (`rolling_robust_z`) for assets with no clean envelope at all.
 - [ ] Condition channel behavior on `operating_context.duty_demand_pct`.
-- [ ] Physics residuals from `assets.csv` curve parameters: hydraulic
-  residual (H vs flow at speed ratio), efficiency proxy, strainer dP,
-  thermal rise lag (tau from simulation_assumptions.md).
+- [x] Physics residuals from `assets.csv` curve parameters
+  (`src/physics.py`): hydraulic residual (rated-affinity curve
+  H(r,Q) = r^2*H0 - a*Q^2, head = dP*kPa/(SG*9.80665)), curve-inversion
+  flow estimate for meter-less assets (with power-based speed-ratio
+  estimate r=(P/P_rated)^(1/3) for VFD pumps lacking a speed channel),
+  efficiency proxy (idle-masked), thermal first-order lag residuals
+  (bearing/winding, tau from simulation_assumptions.md), per-asset
+  `physics_quality` tag (exact/estimated/none). Gate rerun: detection
+  KPIs unchanged (already saturated) but residuals now give the
+  interpretable, curve-consistent evidence the fault-type vector and
+  the SmolLM report need.
 - [ ] Trend extrapolation: trailing 6-24 h drift fit -> time-to-alarm /
   time-to-trip (long-scale prediction) with uncertainty band.
 - [ ] Fault-type likelihood vector from evidence-channel signatures.
@@ -99,7 +107,9 @@ Recorded so later layers can be compared against them:
   38.3 h (PUMP-08 SUCTION_STRAINER_CLOGGING), 31.8 h (PUMP-06 clogging).
 - [x] Benign false-alarm rate (z=3, smoothed over 60 samples):
   6.4% envelope surface only, 8.0% rolling surface only,
-  13.4% union of both surfaces (738 / 5,504 benign rows).
+  13.4% union before physics features (738/5,504); 13.8% with the
+  physics channels added (759/5,504) — negligible FAR cost for the
+  interpretability gained.
 - [ ] Reduce FAR (debounce/state machine, richer features) — target < 2%.
 
 ### Layer 2 detector (learned, numpy only)

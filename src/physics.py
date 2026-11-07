@@ -176,47 +176,50 @@ def add_physics_features(df: pd.DataFrame, assets: pd.DataFrame) -> pd.DataFrame
             load = asset_df["motor_current_a"] / float(params["motor_rated_current_a"])
             out.loc[index, "physics_load_frac"] = load.to_numpy()
 
-        # Hydraulic head: needs suction + discharge; measurement in meters.
-        has_head = ("suction_pressure_kpa" in asset_df.columns
-                    and "discharge_pressure_kpa" in asset_df.columns)
+        # Data availability (not column presence): the bundled CSVs carry
+        # every column for every asset, with NaN where the instrument
+        # doesn't exist on that asset.
+        flow_ok = "flow_m3_h" in asset_df.columns \
+            and asset_df["flow_m3_h"].notna().any()
+        speed_ok = "motor_speed_rpm" in asset_df.columns \
+            and asset_df["motor_speed_rpm"].notna().any()
+        suction_ok = "suction_pressure_kpa" in asset_df.columns \
+            and asset_df["suction_pressure_kpa"].notna().any()
+        discharge_ok = "discharge_pressure_kpa" in asset_df.columns \
+            and asset_df["discharge_pressure_kpa"].notna().any()
+        has_head = suction_ok and discharge_ok
+
         head_meas = pd.Series(np.nan, index=index)
-        if has_head:
+        if has_head and not np.isnan(coeff_a):
             head_meas = (asset_df["discharge_pressure_kpa"]
                          - asset_df["suction_pressure_kpa"]) \
                     * sg / KILO_PASCALS_PER_METER
             out.loc[index, "physics_head_meas_m"] = head_meas.to_numpy()
-            if "flow_m3_h" in asset_df.columns:
+            if flow_ok:
                 head_pred = head_at_speed(
-                    asset_df["motor_speed_rpm"].to_numpy()
-                    if "motor_speed_rpm" in asset_df.columns else speed.to_numpy(),
+                    speed.to_numpy(),
                     asset_df["flow_m3_h"].to_numpy(),
                     float(params["pump_shutoff_head_m"]), coeff_a,
                 )
+                out.loc[index, "physics_head_pred_m"] = np.asarray(head_pred, dtype=float)
+                out.loc[index, "physics_head_residual_m"] = \
+                    (head_meas - out.loc[index, "physics_head_pred_m"]).to_numpy()
+            if flow_ok and speed_ok:
+                out.loc[index, PHYSICS_QUALITY_COLUMN] = "exact"
             else:
-                head_pred = head_at_speed(
-                    speed.to_numpy(), pd.Series(np.nan, index=index).to_numpy(),
+                out.loc[index, PHYSICS_QUALITY_COLUMN] = "estimated"
+            # Estimated flow for assets without a flow meter (inversion).
+            if not flow_ok:
+                flow_est = flow_from_head_m(
+                    speed.to_numpy(), head_meas.to_numpy(),
                     float(params["pump_shutoff_head_m"]), coeff_a,
                 )
-            out.loc[index, "physics_head_pred_m"] = np.asarray(head_pred, dtype=float)
-            quality = "exact" if ("flow_m3_h" in asset_df.columns
-                                  and "motor_speed_rpm" in asset_df.columns) else "estimated"
-            out.loc[index, PHYSICS_QUALITY_COLUMN] = quality
-            out.loc[index, "physics_head_residual_m"] = \
-                (head_meas - out.loc[index, "physics_head_pred_m"]).to_numpy()
-
-        # Estimated flow for assets without a flow meter (curve inversion).
-        if has_head and "flow_m3_h" not in asset_df.columns \
-                and not np.isnan(coeff_a):
-            flow_est = flow_from_head_m(
-                speed.to_numpy(), head_meas.to_numpy(),
-                float(params["pump_shutoff_head_m"]), coeff_a,
-            )
-            out.loc[index, "physics_flow_est_m3h"] = np.asarray(flow_est, dtype=float)
+                out.loc[index, "physics_flow_est_m3h"] = np.asarray(flow_est, dtype=float)
 
         # Efficiency proxy: needs flow, head, power; masked where idle
         # (P_kw < 1 or Q < 1) because eta is meaningless at zero load.
-        if has_head and "flow_m3_h" in asset_df.columns \
-                and "motor_power_kw" in asset_df.columns:
+        if has_head and flow_ok and "motor_power_kw" in asset_df.columns \
+                and asset_df["motor_power_kw"].notna().any():
             eta = efficiency_pct(
                 asset_df["flow_m3_h"].to_numpy(), head_meas.to_numpy(),
                 asset_df["motor_power_kw"].to_numpy(), sg,

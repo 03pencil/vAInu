@@ -69,7 +69,11 @@ smollm2:135m -> mistral -> gemma4:e2b).
    self-adaptive rolling second surface (rolling_robust_z). PENDING:
    conditioning on `operating_context.duty_demand_pct` (load
    matters: normal at 60% demand differs from 90%).
-2. Physics residuals (gold features, parameters come from `assets.csv`):
+2. Physics residuals (gold features, parameters come from `assets.csv`).
+   IMPLEMENTED (`src/physics.py`): hydraulic residual from the
+   affinity-scaled curve, curve-inversion flow estimate +
+   power-based speed-ratio estimate, efficiency proxy, thermal lag
+   residuals; wired into the gate as extra z channels.
    - hydraulic residual: measured head vs pump-curve H(r,Q), up with
      DISCHARGE_RESTRICTION, down with IMPPELLER_WEAR
    - efficiency proxy: hydraulic power / motor_power_kw

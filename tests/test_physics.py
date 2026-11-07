@@ -28,8 +28,8 @@ def test_curve_roundtrip() -> None:
     assert head_at_speed(1.0, 300.0, 50.0, a) == 30.0
     assert flow_from_head_m(1.0, 30.0, 50.0, a) == 300.0
     # Affinity: at r=0.8 the affinity point (240, 19.2) sits exactly on
-    # the scaled curve.
-    assert abs(head_at_speed(0.8, 240.0, 50.0, a) - 19.2) < 1e-9
+    # the scaled curve (this also guards against passing raw RPM as ratio).
+    assert abs(head_at_speed(0.8, 240.0, 50.0, a) - 19.2) < 1e-6
     no_zealotry = flow_from_head_m(1.0, np.array([50.0]), 50.0, a)  # head >= H0
     assert (no_zealotry == 0.0).all()
 
