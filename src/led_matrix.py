@@ -1,7 +1,7 @@
 """LED matrix animation for the Arduino UNO Q 8x13 display.
 
 Draws "vAInu" scrolling across the matrix over a sparkle background. Each
-frame is sent to the MCU sketch (arduino/led_matrix/sketch.ino) through the
+frame is sent to the MCU sketch (arduino/led_matrix_app/sketch/sketch.ino) through the
 Bridge as 104 characters of '0' and '1'. Off the board there is no Bridge,
 so callers can only preview the frames.
 

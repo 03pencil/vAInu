@@ -4,7 +4,7 @@ Usage:
     .venv/bin/python scripts/led_matrix.py                  # on the board: send frames to the MCU
     .venv/bin/python scripts/led_matrix.py --preview --duration 3   # on a PC: print frames
 
---duration 0 runs until Ctrl+C. The MCU needs arduino/led_matrix/sketch.ino.
+--duration 0 runs until Ctrl+C. The MCU needs the sketch in arduino/led_matrix_app/ flashed with Arduino App Lab.
 """
 from __future__ import annotations
 

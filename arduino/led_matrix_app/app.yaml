@@ -1,0 +1,6 @@
+# App Lab app: vAInu LED matrix animation.
+name: vAInu LED
+description: "Scrolls vAInu on the 8x13 LED matrix with a sparkle background"
+icon: "✨"
+ports: []
+bricks: []
