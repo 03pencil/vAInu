@@ -1,33 +1,31 @@
-"""Configuration loader for vAInu (stdlib only, Python 3 compatible)."""
+"""Configuration loader for vAInu (stdlib tomllib, Python 3.11+)."""
 from __future__ import annotations
 
-import configparser
 import os
+import tomllib
 
-CONFIG_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config.ini")
-
-
-def load_config(path: str = CONFIG_FILE) -> configparser.ConfigParser:
-    """Load and return the project configuration."""
-    cfg = configparser.ConfigParser()
-    cfg.read(path)
-    return cfg
+CONFIG_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config.toml")
 
 
-def get_data_dir(cfg: configparser.ConfigParser | None = None) -> str:
+def load_config(path: str = CONFIG_FILE) -> dict:
+    """Load and return the project configuration as a dict."""
+    with open(path, "rb") as f:
+        return tomllib.load(f)
+
+
+def get_data_dir(cfg: dict | None = None) -> str:
     if cfg is None:
         cfg = load_config()
-    return cfg.get("paths", "data_dir", fallback="data/full")
+    return cfg.get("paths", {}).get("data_dir", "data/full")
 
 
-def get_channels(cfg: configparser.ConfigParser | None = None) -> list[str]:
+def get_channels(cfg: dict | None = None) -> list[str]:
     if cfg is None:
         cfg = load_config()
-    raw = cfg.get("channels", "names", fallback="pressure,temperature,vibration,flow")
-    return [c.strip() for c in raw.split(",") if c.strip()]
+    return cfg.get("channels", {}).get("names", ["pressure", "temperature", "vibration", "flow"])
 
 
-def get_rolling_window(cfg: configparser.ConfigParser | None = None) -> int:
+def get_rolling_window(cfg: dict | None = None) -> int:
     if cfg is None:
         cfg = load_config()
-    return cfg.getint("analysis", "rolling_window", fallback=5)
+    return cfg.get("analysis", {}).get("rolling_window", 5)
