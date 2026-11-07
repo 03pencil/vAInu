@@ -73,7 +73,8 @@ python scripts/web_ui.py --data data/full --cache-dir "" # disable the cache
 > (`data/full/telemetry/`), which are excluded by `.gitignore`. If they are
 > missing from the checkout, point `--data` at the original participant
 > bundle. The dashboard uses the same robust
-> envelope math as `scripts/sanity_gate.py`; SmolLM narration is not wired yet.
+> envelope math as `scripts/sanity_gate.py`. SmolLM narration is a separate
+> batch step: `scripts/narrate.py` (see `[llm]` in `config.toml`).
 
 ## Tech Stack
 # Start the dashboard, then open http://127.0.0.1:8000
@@ -115,7 +116,7 @@ for f in tests/test_*.py; do .venv/bin/python "$f" || break; done
 
 - The data is synthetic. There is no field evidence yet.
 - The dashboard has no login. Run it only on a trusted network.
-- SmolLM narration is not connected to the dashboard yet.
+- SmolLM narration runs as a batch job and is off by default (`[llm] enabled = false`). Its text is checked, but it is still advisory.
 
 ## Team and license
 
