@@ -120,11 +120,15 @@ Recorded so later layers can be compared against them:
 - [ ] Hand-written logistic-regression fault classifier (GD/lstsq).
 - [ ] Horizons: 10-min / 1 h / days (RUL-style); state-machine debounce.
 
-### Layer 3 SmolLM chain
-- [ ] Situation-report serializer (fixed ~200-token text format).
-- [ ] Wire `~/chain_models.py` analysis mode -> structured JSON verdict
-  constrained to the fault taxonomy from events_train.csv.
-- [ ] Fuse `maintenance.csv operator_observation` free text.
+### Layer 3 SmolLM narration (single model: smollm2:1.7b)
+- [ ] Situation-report serializer (fixed text format from the pilot record).
+- [ ] `scripts/narrate.py`: one SmolLM call per alarm episode -> `pilot/analysis.jsonl`.
+- [ ] Validator: reject non-JSON, numbers not in the input, and off-taxonomy labels.
+- [ ] `[llm]` config section, off by default; stub-server tests.
+- [ ] Narration panel in the web UI (separate from the pilot table).
+- [ ] Measured fault-type choice vs events_train.csv labels (later).
+- [ ] Fuse `maintenance.csv operator_observation` free text (later).
+- [x] Retire the host chain (smollm2:135m -> mistral -> gemma4:e2b) from the plan.
 
 ### Feedback loop (improving over time)
 - [ ] Prediction log (inputs, score, RUL claim, timestamp).
@@ -169,8 +173,8 @@ Recorded so later layers can be compared against them:
   - PUMP-03, -04, -08 are still `unknown` after the envelope-fallback commit
     `946a8ea`.
 - [x] Decide the SmolLM tag for the UNO Q: `smollm2:1.7b` (better structured
-  output; fits the 4 GB board). `plan.md` / `skill_data.md` still name
-  `smollm2:135m` for the host chain; update them when the SmolLM layer lands.
+  output; fits the 4 GB board). Only SmolLM is used; mistral and gemma4 are
+  removed from the plan.
 - [x] Board test step 1: pilot + web UI without LLM (manual section 7), 2026-11-07.
 - [ ] Board test step 2: SmolLM layer on the board (Ollama install per manual
   sections 4–5, serializer, alarm-triggered call, JSON validation, fallback).
