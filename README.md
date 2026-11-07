@@ -89,6 +89,10 @@ The first version includes:
 
 🙏 Special thanks to **Majos Hacking League** for providing the **Arduino UNO Q** used in this project.
 
+## Built with
+
+Development used [OpenCode](https://opencode.ai) with **Claude Haiku 5.5** (free tier, `beam free`).
+
 ## License
 
 See [`LICENSE`](LICENSE). Project code is MIT (© 2026 P. Gaidach & M. Hirvonen). Original dataset © Since AI ry, CC BY 4.0.
