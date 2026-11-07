@@ -20,3 +20,12 @@ Thumbs.db
 # Folders
 
 
+<<<<<<< Updated upstream
+=======
+
+# Pilot output (state.json, predictions.jsonl)
+/pilot/
+
+# Rebuild cache (finished alarm surface)
+/cache/
+>>>>>>> Stashed changes

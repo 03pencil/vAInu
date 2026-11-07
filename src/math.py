@@ -7,6 +7,8 @@ retrofit sensors) are masked, never filled or dropped globally.
 """
 from __future__ import annotations
 
+from typing import Any, Iterable
+
 import numpy as np
 import pandas as pd
 
@@ -181,11 +183,52 @@ def group_rolled(
     return pd.concat(parts).sort_index()
 
 
+def _run_jobs(
+    func: Any,
+    jobs: Iterable[Any],
+    workers: "int | None",
+    total: int,
+) -> list:
+    """Run picklable `jobs` serially or in a process pool, preserving order.
+
+    `workers=None` or 1 keeps the serial path, so callers that do not opt in
+    never pay pool-startup cost. Pool workers re-import numpy/pandas once,
+    which is why small jobs stay serial.
+    """
+    if workers is None or workers <= 1 or total <= 1:
+        return [func(job) for job in jobs]
+    from concurrent.futures import ProcessPoolExecutor
+
+    chunksize = max(1, total // (max(1, workers) * 2))
+    with ProcessPoolExecutor(max_workers=min(workers, total)) as pool:
+        return list(pool.map(func, jobs, chunksize=chunksize))
+
+
+def _rolling_z_block(job: "tuple[np.ndarray, int, int]") -> np.ndarray:
+    """Trailing rolling modified z-scores for one channel block.
+
+    Module-level so a process pool can ship it by reference. Same arithmetic
+    as the historical per-Series branch, so serial and parallel agree bit for
+    bit.
+    """
+    values, window, min_periods = job
+    values = np.asarray(values, dtype=float)
+    series = pd.Series(values)
+    median = series.rolling(window=window, min_periods=min_periods).median()
+    mad = (series - median).abs().rolling(
+        window=window, min_periods=min_periods,
+    ).median()
+    spread = np.where(mad.to_numpy() > 0, mad.to_numpy(), np.nan)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        return Z_CONSTANT * (values - median.to_numpy()) / spread
+
+
 def rolling_robust_z(
     df: pd.DataFrame,
     window: int = 60,
     channels: "list[str] | None" = None,
     by: "tuple[str, ...]" = ("asset_id",),
+    workers: "int | None" = None,
 ) -> pd.DataFrame:
     """Self-referential rolling z-scores (asset-adaptive envelope).
 
@@ -193,17 +236,36 @@ def rolling_robust_z(
     (10 s grid -> 60 samples = 10 min). Slower to react than the benign
     envelope in `modified_zscores` but needs no training data; slow
     drifts are invisible to it by construction.
+
+    `workers` > 1 scores the (asset, channel) blocks in parallel processes.
+    Results are identical to the serial path; only wall-clock time changes.
     """
     if channels is None:
         channels = channel_columns(df)
-    parts = []
+    z_columns = [f"z_{channel}" for channel in channels]
+    if df.empty:
+        return pd.DataFrame(columns=z_columns)
+
     min_periods = max(2, window // 2)
-    for _, part in df.groupby(list(by), sort=False):
-        scores = {}
-        for channel in channels:
-            values = part[channel].astype(float)
-            median = values.rolling(window=window, min_periods=min_periods).median()
-            mad = (values - median).abs().rolling(window=window, min_periods=min_periods).median()
-            scores[f"z_{channel}"] = Z_CONSTANT * (values - median) / mad.where(mad > 0)
-        parts.append(pd.DataFrame(scores, index=part.index))
+    positions = df.groupby(list(by), sort=False).indices
+    values = {channel: df[channel].to_numpy(dtype=float) for channel in channels}
+    layout = [
+        (key, channel, index)
+        for key, index in positions.items()
+        for channel in channels
+    ]
+    jobs = (
+        (values[channel][index], window, min_periods)
+        for key, index in positions.items()
+        for channel in channels
+    )
+    results = _run_jobs(_rolling_z_block, jobs, workers, len(layout))
+
+    blocks: dict[Any, dict[str, np.ndarray]] = {}
+    for (key, channel, _), scores in zip(layout, results):
+        blocks.setdefault(key, {})[f"z_{channel}"] = scores
+    parts = [
+        pd.DataFrame(blocks[key], index=df.index[index])
+        for key, index in positions.items()
+    ]
     return pd.concat(parts).sort_index()
