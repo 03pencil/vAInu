@@ -138,6 +138,15 @@ Recorded so later layers can be compared against them:
   math/ML and runs as plain Python on the UNO Q MPU.
 
 ## M6: Deploy on UNO Q
+- [x] Pilot replay path (no hardware): `src/feed.py` ReplayFeed on starter
+  telemetry, `src/pilot.py` streaming monitor, `scripts/pilot_run.py`
+  writes `pilot/state.json` + `pilot/predictions.jsonl`.
+- [x] UART frame contract + parser (`src/feed.py` `parse_frame`, JSON line).
+- [ ] UART reader on PC/MPU (`UartFeed` is a stub until the logic box exists).
+- [ ] Pilot monitor: rolling-envelope fallback for assets with no clean
+  envelope (PUMP-03/04/08 report `unknown` today).
+- [ ] Pilot monitor: physics channels and trend time-to-limit.
+- [ ] Serve pilot state in the web UI (`src/web_ui.py`) from `pilot/state.json`.
 - [x] First local web UI prototype (`scripts/web_ui.py`): asset status,
   latest values, top deviations, channel chart, replay; stdlib server only.
 - [ ] Create App Lab app skeleton.
