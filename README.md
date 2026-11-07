@@ -1,25 +1,51 @@
-# vAInu - Pump Sensor Project
+# 🏭 vAInu — Pump Sensor Project
 
-For the sinceAI 2026 Hackathon in Turku.
+> Edge AI for predictive pump maintenance, running on an Arduino UNO Q.
 
-Arduino UNO Q based pump sensory project using local AI.
+Built for the **SinceAI 2026 Hackathon** in Turku.
 
-## Structure
+**Main objective:** build the prediction algorithm that SmolLM uses to analyse pump telemetry and forecast faults.
+
+**Scope:** designed to be widely retrofit-compatible — usable across a wide selection of pumps and motors in both maritime and industrial environments. Operates in **maintenance prediction mode**, forecasting faults before they occur.
+
+## Overview
+
+Pump sensors stream telemetry to a logic box, which forwards it to an **Arduino UNO Q**. The UNO Q's MPU runs a **SmolLM** model locally, analysing the data and serving results to a minimal web UI on the local network. The Arduino only receives data from the pump logic circuit and outputs results elsewhere — it has no other inbound connections.
+
+```mermaid
+flowchart LR
+    A[Pump Sensors] --> B[Logic Box]
+    B --> C[Arduino UNO Q MCU]
+    C --> D[MPU / SmolLM inference]
+    D --> E[Analysed Data]
+    D --> F[Minimal Web UI]
+```
+
+See [`plan.md`](plan.md) for the full architecture and roadmap, and [`to-do.md`](to-do.md) for the task breakdown.
+
+## Architecture
+
+- 📡 Pump sensors → logic box (collect/forward telemetry)
+- 🔗 Logic box → Arduino UNO Q (single inbound data path; MCU receives, MPU runs LLM inference)
+- 🖥️ Arduino UNO Q → minimal web UI (live values + predictions, local network only)
+
+## Repository Structure
 
 - `data/` — pump telemetry dataset (full + starter tiers). Treat as the only data source.
 - `skills/` — installed agent skills (ei-build-arduino-uno-q-app-lab) + project skill notes.
 - `tests/` — tests.
 - `skill_data.md` — instructions about the data and coding style.
 
-## Infrastructure (local development)
+## Tech Stack
 
-- Local LLM chain via Ollama (`ollama serve` on localhost:11434):
-  - `smollm2:135m` — fast sub-task model (extract numbers/facts).
-  - `mistral` — mid reasoning step.
-  - `gemma4:e2b` — main task model.
-  - Chain script: `python3 ~/chain_models.py <mode> "<text>"` where mode is `code`, `data`, or `analysis`.
-- Python venv: `.venv/` with `pandas`, `numpy`, `scipy`, `matplotlib` (use `.venv/bin/python`).
+- Python / MicroPython, PEP 8, simple but effective.
+- `pandas`, `numpy`, `scipy`, `matplotlib`.
+- SmolLM (GGUF via llama.cpp) running on the UNO Q MPU.
 
-## Coding
+## Acknowledgements
 
-Python / MicroPython, PEP 8, simple but effective. Uses matplotlib and pandas.
+🙏 Special thanks to **Majos Hacking League** for providing the **Arduino UNO Q** used in this project.
+
+## License
+
+See [`LICENSE`](LICENSE). Project code is MIT (© 2026 P. Gaidach & M. Hirvonen). Original dataset © Since AI ry, CC BY 4.0.

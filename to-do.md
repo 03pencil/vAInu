@@ -20,6 +20,7 @@
 - [ ] Store feature dataset.
 
 ## M4: Model
+- [ ] Define prediction algorithm (anomaly/fault scoring logic for SmolLM).
 - [ ] Label benign vs event windows.
 - [ ] Train lightweight anomaly/fault detector on benign windows.
 - [ ] Validate on event windows.
