@@ -161,6 +161,34 @@ def test_asset_payload_keeps_explicit_empty_channel() -> None:
     assert all(math.isnan(value) for value in payload["values"])
 
 
+def test_asset_payload_overlays_multiple_series() -> None:
+    payload = _fake_dashboard().asset_payload(
+        "PUMP-X",
+        channel="suction_pressure_kpa",
+        channels=["suction_pressure_kpa", "discharge_pressure_kpa",
+                  "vibration_rms_mm_s"],
+        window=3,
+    )
+    assert [entry["channel"] for entry in payload["series"]] == [
+        "suction_pressure_kpa", "discharge_pressure_kpa",
+        "vibration_rms_mm_s",
+    ]
+    assert payload["series"][0]["values"] == [32.0, 33.0, 34.0]
+    assert payload["series"][1]["values"] == [102.0, 103.0, 104.0]
+    assert all(math.isnan(value) for value in payload["series"][2]["values"])
+
+
+def test_asset_payload_caps_series_at_three() -> None:
+    payload = _fake_dashboard().asset_payload(
+        "PUMP-X",
+        channels=["suction_pressure_kpa", "discharge_pressure_kpa",
+                  "vibration_rms_mm_s", "not_a_channel"],
+        window=2,
+    )
+    assert len(payload["series"]) == 3
+    assert "not_a_channel" not in [entry["channel"] for entry in payload["series"]]
+
+
 def test_rolling_robust_z_parallel_matches_serial() -> None:
     """The process-pool path must reproduce the serial numbers exactly."""
     rng = np.random.default_rng(7)
@@ -215,6 +243,8 @@ if __name__ == "__main__":
         test_top_deviations_sorts_by_absolute_z,
         test_asset_payload_falls_back_to_channel_with_data,
         test_asset_payload_keeps_explicit_empty_channel,
+        test_asset_payload_overlays_multiple_series,
+        test_asset_payload_caps_series_at_three,
         test_rolling_robust_z_parallel_matches_serial,
         test_surface_cache_round_trip,
         test_cache_key_tracks_settings,

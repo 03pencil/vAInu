@@ -70,7 +70,7 @@ def test_channels_respect_config_and_nan_drop() -> None:
 def test_assets_and_channel_masks() -> None:
     assets = load_assets()
     assert not assets.empty
-    full = asset_channels("PUMP-04", assets)      # T2_FULL -> many channels
+    full = asset_channels("PUMP-02", assets)      # T2_FULL -> many channels
     legacy = asset_channels("PUMP-03", assets)    # T0_LEGACY -> few channels
     assert len(full) >= len(legacy)
     assert asset_channels("NOPE-99", assets) == []

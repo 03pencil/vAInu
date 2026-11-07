@@ -58,6 +58,7 @@ from .math import group_rolled, merged_stats, modified_zscores, rolling_robust_z
 from .narration import read_latest_narrations
 
 MAX_WINDOW = 5000
+MAX_SERIES = 3
 STATUS_OK = "OK"
 STATUS_WATCH = "WATCH"
 STATUS_ALARM = "ALARM"
@@ -536,8 +537,13 @@ class DashboardData:
         channel: str | None = None,
         cursor: int | None = None,
         window: int = 240,
+        channels: "list[str] | None" = None,
     ) -> dict[str, Any]:
-        """Chart window + latest values + top deviations for one asset."""
+        """Chart window + latest values + top deviations for one asset.
+
+        ``channels`` adds an overlaid ``series`` list (up to MAX_SERIES);
+        the scalar ``channel``/``values`` fields remain the primary series.
+        """
         item = self._by_id.get(asset_id)
         if item is None:
             raise KeyError(f"Unknown asset: {asset_id}")
@@ -549,6 +555,17 @@ class DashboardData:
         if channel is None:
             raise ValueError(f"No channels with data for {asset_id}.")
 
+        selected = [name for name in (channels or [channel]) if name in item.values]
+        if not selected:
+            selected = [channel]
+        if channels and channel not in selected:
+            channel = selected[0]
+        selected = list(dict.fromkeys(selected))
+        if channel in selected:
+            selected.remove(channel)
+            selected.insert(0, channel)
+        selected = selected[:MAX_SERIES]
+
         window = max(2, min(int(window), MAX_WINDOW, total))
         start = max(0, cursor - window + 1)
 
@@ -559,6 +576,15 @@ class DashboardData:
         values = item.values[channel][start:cursor + 1]
         z_values = item.z[channel][start:cursor + 1]
         alarm = item.alarm[start:cursor + 1]
+        series = [
+            {
+                "channel": name,
+                "unit": self.units.get(name, "-"),
+                "values": item.values[name][start:cursor + 1].tolist(),
+                "z": item.z[name][start:cursor + 1].tolist(),
+            }
+            for name in selected
+        ]
         score = max_abs_z(item, cursor, self.channels)
         status = status_for(
             item.modes[cursor], bool(item.alarm[cursor]), score,
@@ -590,6 +616,7 @@ class DashboardData:
             "timestamps": timestamps,
             "values": values.tolist(),
             "z": z_values.tolist(),
+            "series": series,
             "alarm": alarm.tolist(),
             "available_channels": [
                 {"name": name, "unit": self.units.get(name, "-")}
@@ -678,12 +705,17 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 asset_id = unquote(parsed.path[len("/api/asset/"):])
                 query = parse_qs(parsed.query)
                 channel = query.get("channel", [None])[0] or None
+                raw_channels = query.get("channels", [""])[0]
+                channels = [
+                    name for name in raw_channels.split(",") if name
+                ][:MAX_SERIES]
                 cursor = self._optional_int(query, "cursor")
                 window = self._optional_int(query, "window")
                 if window is None:
                     window = int(self.web_config["history_samples"])
                 self._send_json(self.data.asset_payload(
-                    asset_id, channel=channel, cursor=cursor, window=window,
+                    asset_id, channel=channel, channels=channels or None,
+                    cursor=cursor, window=window,
                 ))
             else:
                 self._send_json({"error": "Not found"}, status=404)
@@ -899,7 +931,50 @@ h2 { margin: 0; font-size: 15px; font-weight: 600; }
 .value { font-size: 20px; font-weight: 600; margin-top: 6px; }
 .panel { margin-bottom: 16px; }
 .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
-.controls { display: flex; gap: 8px; }
+.controls { display: flex; gap: 8px; align-items: center; }
+.channel-picker { position: relative; }
+.channel-toggle {
+  min-width: 210px;
+  max-width: 280px;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.channel-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 20;
+  min-width: 280px;
+  max-height: 330px;
+  overflow-y: auto;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 6px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+}
+.channel-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.channel-option:hover { background: rgba(255, 255, 255, 0.05); }
+.channel-option.disabled { opacity: 0.45; cursor: not-allowed; }
+.channel-option input { accent-color: var(--accent); }
+.channel-swatch { width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--line); }
+.channel-note { color: var(--muted); font-size: 11px; padding: 4px 8px 6px; }
+.series-legend { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 8px; font-size: 12px; }
+.legend-item { display: flex; align-items: center; gap: 6px; }
+.legend-swatch { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+.legend-range { color: var(--muted); }
+.chart-note { color: var(--muted); font-size: 11px; margin-top: 4px; }
 .select, .btn, .slider {
   background: var(--panel-2);
   color: var(--text);
@@ -1008,7 +1083,14 @@ h2 { margin: 0; font-size: 15px; font-weight: 600; }
       <div class="panel-head">
         <h2>Signal</h2>
         <div class="controls">
-          <select id="channel-select" class="select"></select>
+          <div class="channel-picker" id="channel-picker">
+            <button id="channel-toggle" class="select channel-toggle" type="button"
+                    aria-label="Chart channels" aria-haspopup="true"
+                    aria-controls="channel-menu" aria-expanded="false">
+              <span id="channel-toggle-label">Select channels</span>
+            </button>
+            <div id="channel-menu" class="channel-menu hidden"></div>
+          </div>
           <select id="window-select" class="select"></select>
         </div>
       </div>
@@ -1056,11 +1138,13 @@ h2 { margin: 0; font-size: 15px; font-weight: 600; }
   </main>
 </div>
 <script>
+const SERIES_COLORS = ["#5ea0ff", "#f5b84b", "#35d07f"];
+
 const state = {
   config: null,
   overview: [],
   assetId: null,
-  channel: null,
+  channels: [],
   cursor: null,
   playing: false,
   speed: 5,
@@ -1253,7 +1337,6 @@ async function selectAsset(assetId) {
     state.assetId = assetId;
     state.cursor = null;
     state.playing = false;
-    state.channel = null;
     updatePlayButton();
   }
   renderSidebar();
@@ -1264,14 +1347,23 @@ async function fetchAsset() {
   if (!state.assetId) return;
   const requestId = ++state.fetchSeq;
   const params = new URLSearchParams();
-  params.set("channel", state.channel || "");
+  if (state.channels.length) params.set("channels", state.channels.join(","));
   params.set("window", String(state.window));
   if (state.cursor !== null) params.set("cursor", String(state.cursor));
   const payload = await api("/api/asset/" + encodeURIComponent(state.assetId) + "?" + params.toString());
   if (requestId !== state.fetchSeq) return;
   state.asset = payload;
   if (state.cursor === null) state.cursor = payload.cursor;
-  state.channel = payload.channel;
+  const available = new Set(
+    (payload.available_channels || []).map((entry) => entry.name),
+  );
+  state.channels = state.channels
+    .filter((name) => available.has(name))
+    .slice(0, 3);
+  if (!state.channels.length) {
+    state.channels = (payload.series || []).map((entry) => entry.channel);
+  }
+  if (!state.channels.length) state.channels = [payload.channel];
   render();
 }
 
@@ -1287,25 +1379,13 @@ function render() {
   $("mode").textContent = data.mode || "-";
   $("last-update").textContent = formatTime(data.last_update);
   $("alarm-score").textContent = formatScore(data.alarm_score);
-  $("channel-label").textContent = data.channel + " (" + (data.unit || "-") + ")";
+  $("channel-label").textContent = state.channels.length > 1
+    ? state.channels.length + " channels selected"
+    : data.channel + " (" + (data.unit || "-") + ")";
   $("live-label").textContent = state.playing
     ? "REPLAY" : (state.cursor >= data.total - 1 ? "LATEST" : "PAUSED");
 
-  const select = $("channel-select");
-  const optionNames = [...select.options].map((option) => option.value);
-  const channelNames = data.available_channels.map((channel) => channel.name);
-  if (optionNames.join("|") !== channelNames.join("|")) {
-    select.innerHTML = "";
-    for (const channel of data.available_channels) {
-      const option = document.createElement("option");
-      option.value = channel.name;
-      option.textContent = channel.unit && channel.unit !== "-"
-        ? channel.name + " (" + channel.unit + ")" : channel.name;
-      select.appendChild(option);
-    }
-  }
-  select.value = data.channel;
-
+  renderChannelMenu(data);
   renderChart(data);
   renderLatest(data);
   renderTop(data);
@@ -1351,34 +1431,128 @@ function renderTop(data) {
   }
 }
 
+function seriesColor(name) {
+  const index = state.channels.indexOf(name);
+  return index >= 0 ? SERIES_COLORS[index] : "#9aa7bd";
+}
+
+function renderChannelMenu(data) {
+  const menu = $("channel-menu");
+  const channels = data.available_channels || [];
+  const names = channels.map((channel) => channel.name).join("|");
+  if (menu.dataset.names !== names) {
+    menu.dataset.names = names;
+    menu.innerHTML = "";
+    for (const channel of channels) {
+      const label = document.createElement("label");
+      label.className = "channel-option";
+      label.dataset.channel = channel.name;
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.value = channel.name;
+      input.addEventListener("change", () => {
+        toggleChannel(channel.name, input.checked);
+      });
+      const swatch = document.createElement("span");
+      swatch.className = "channel-swatch";
+      const text = document.createElement("span");
+      text.textContent = channel.unit && channel.unit !== "-"
+        ? channel.name + " (" + channel.unit + ")" : channel.name;
+      label.append(input, swatch, text);
+      menu.appendChild(label);
+    }
+    const note = document.createElement("div");
+    note.className = "channel-note";
+    note.textContent = "Choose 1-3 channels. Colors match the chart.";
+    menu.appendChild(note);
+  }
+  for (const label of menu.querySelectorAll(".channel-option")) {
+    const name = label.dataset.channel;
+    const input = label.querySelector("input");
+    const checked = state.channels.includes(name);
+    input.checked = checked;
+    input.disabled = (!checked && state.channels.length >= 3) ||
+      (checked && state.channels.length === 1);
+    label.classList.toggle("disabled", input.disabled);
+    const swatch = label.querySelector(".channel-swatch");
+    swatch.style.background = checked ? seriesColor(name) : "var(--line)";
+  }
+  $("channel-toggle-label").textContent = state.channels.length > 1
+    ? state.channels.length + " channels"
+    : (state.channels[0] || "Select channels");
+}
+
+async function toggleChannel(name, checked) {
+  if (checked) {
+    if (state.channels.length >= 3 || state.channels.includes(name)) return;
+    state.channels.push(name);
+  } else {
+    if (state.channels.length <= 1) return;
+    state.channels = state.channels.filter((channel) => channel !== name);
+  }
+  await fetchAsset();
+}
+
 function renderChart(data) {
   const container = $("chart");
-  const values = data.values || [];
-  const finite = values.filter((value) => value !== null && Number.isFinite(value));
-  if (finite.length === 0) {
-    container.innerHTML = '<div class="empty">No data for this channel in the selected window.</div>';
+  const source = (data.series && data.series.length
+    ? data.series
+    : [{channel: data.channel, unit: data.unit, values: data.values, z: data.z}]
+  ).slice(0, 3);
+  const prepared = source.map((entry, index) => {
+    const values = entry.values || [];
+    const finite = values.filter((value) => value !== null && Number.isFinite(value));
+    let actualMin = null;
+    let actualMax = null;
+    let min = null;
+    let max = null;
+    if (finite.length) {
+      actualMin = Math.min(...finite);
+      actualMax = Math.max(...finite);
+      min = actualMin;
+      max = actualMax;
+      if (min === max) { min -= 1; max += 1; }
+      const span = max - min;
+      min -= span * 0.06;
+      max += span * 0.06;
+    }
+    return {
+      channel: entry.channel,
+      unit: entry.unit,
+      values,
+      finite,
+      actualMin,
+      actualMax,
+      min,
+      max,
+      color: SERIES_COLORS[index] || "#9aa7bd",
+    };
+  });
+  const drawn = prepared.filter((entry) => entry.finite.length);
+  if (!drawn.length) {
+    container.innerHTML = '<div class="empty">No data for the selected channels in this window.</div>';
     return;
   }
+  const length = Math.max(...prepared.map((entry) => entry.values.length));
   const width = 800;
   const height = 260;
   const pad = {left: 56, right: 12, top: 14, bottom: 30};
   const plotW = width - pad.left - pad.right;
   const plotH = height - pad.top - pad.bottom;
-  let min = Math.min(...finite);
-  let max = Math.max(...finite);
-  if (min === max) { min -= 1; max += 1; }
-  const span = max - min;
-  min -= span * 0.06;
-  max += span * 0.06;
-  const x = (index) => pad.left + (values.length <= 1 ? 0 : (index / (values.length - 1)) * plotW);
-  const y = (value) => pad.top + plotH - ((value - min) / (max - min)) * plotH;
+  const x = (index) => pad.left + (length <= 1 ? 0 : (index / (length - 1)) * plotW);
+  const y = (entry, value) => pad.top + plotH -
+    ((value - entry.min) / (entry.max - entry.min)) * plotH;
 
-  let svg = '<svg viewBox="0 0 ' + width + " " + height + '" role="img" aria-label="' + escapeHtml(data.channel) + ' chart">';
+  const title = prepared.map((entry) => entry.channel).join(", ");
+  let svg = '<svg viewBox="0 0 ' + width + " " + height + '" role="img" aria-label="' + escapeHtml(title) + ' chart">';
   for (let i = 0; i <= 4; i++) {
     const gy = pad.top + (plotH * i) / 4;
-    const label = max - ((max - min) * i) / 4;
     svg += '<line x1="' + pad.left + '" y1="' + gy + '" x2="' + (width - pad.right) + '" y2="' + gy + '" class="grid"/>';
-    svg += '<text x="' + (pad.left - 8) + '" y="' + (gy + 4) + '" class="axis" text-anchor="end">' + label.toFixed(2) + "</text>";
+    if (prepared.length === 1) {
+      const only = prepared[0];
+      const label = only.max - ((only.max - only.min) * i) / 4;
+      svg += '<text x="' + (pad.left - 8) + '" y="' + (gy + 4) + '" class="axis" text-anchor="end">' + label.toFixed(2) + "</text>";
+    }
   }
   let runStart = null;
   for (let i = 0; i <= data.alarm.length; i++) {
@@ -1392,24 +1566,42 @@ function renderChart(data) {
       runStart = null;
     }
   }
-  let path = "";
-  let started = false;
-  for (let i = 0; i < values.length; i++) {
-    const value = values[i];
-    if (value === null || !Number.isFinite(value)) { started = false; continue; }
-    path += (started ? "L" : "M") + x(i).toFixed(2) + "," + y(value).toFixed(2) + " ";
-    started = true;
-  }
-  svg += '<path d="' + path + '" class="line"/>';
-  const last = values.length - 1;
-  if (values[last] !== null && Number.isFinite(values[last])) {
-    svg += '<circle cx="' + x(last) + '" cy="' + y(values[last]) + '" r="3.5" class="last-dot"/>';
+  for (const entry of drawn) {
+    let path = "";
+    let started = false;
+    let lastIndex = -1;
+    for (let i = 0; i < entry.values.length; i++) {
+      const value = entry.values[i];
+      if (value === null || !Number.isFinite(value)) { started = false; continue; }
+      path += (started ? "L" : "M") + x(i).toFixed(2) + "," + y(entry, value).toFixed(2) + " ";
+      started = true;
+      lastIndex = i;
+    }
+    svg += '<path d="' + path + '" class="line" style="stroke:' + entry.color + '"/>';
+    if (lastIndex >= 0) {
+      svg += '<circle cx="' + x(lastIndex) + '" cy="' + y(entry, entry.values[lastIndex]) +
+        '" r="3.5" class="last-dot" style="fill:' + entry.color + '"/>';
+    }
   }
   svg += '<text x="' + pad.left + '" y="' + (height - 8) + '" class="axis">' + formatTime(data.timestamps[0]) + "</text>";
   svg += '<text x="' + (width - pad.right) + '" y="' + (height - 8) + '" class="axis" text-anchor="end">' +
     formatTime(data.timestamps[data.timestamps.length - 1]) + "</text>";
   svg += "</svg>";
-  container.innerHTML = svg;
+
+  const legend = prepared.map((entry) => {
+    const latest = entry.finite.length ? entry.finite[entry.finite.length - 1] : null;
+    const range = entry.finite.length
+      ? "[" + formatNumber(entry.actualMin, "") + " - " +
+        formatNumber(entry.actualMax, entry.unit) + "]"
+      : "no data in window";
+    return '<span class="legend-item"><span class="legend-swatch" style="background:' + entry.color + '"></span>' +
+      escapeHtml(entry.channel) + " " + escapeHtml(formatNumber(latest, entry.unit)) +
+      ' <span class="legend-range">' + escapeHtml(range) + "</span></span>";
+  }).join("");
+  const note = prepared.length > 1
+    ? '<div class="chart-note">Each line is scaled to its own min-max; the legend shows actual values.</div>'
+    : "";
+  container.innerHTML = svg + '<div class="series-legend">' + legend + "</div>" + note;
 }
 
 function updatePlayButton() {
@@ -1455,9 +1647,18 @@ async function init() {
   }
 }
 
-$("channel-select").addEventListener("change", async (event) => {
-  state.channel = event.target.value;
-  await fetchAsset();
+$("channel-toggle").addEventListener("click", (event) => {
+  event.stopPropagation();
+  const menu = $("channel-menu");
+  const open = menu.classList.contains("hidden");
+  menu.classList.toggle("hidden", !open);
+  $("channel-toggle").setAttribute("aria-expanded", String(open));
+});
+document.addEventListener("click", (event) => {
+  if (!event.target.closest("#channel-picker")) {
+    $("channel-menu").classList.add("hidden");
+    $("channel-toggle").setAttribute("aria-expanded", "false");
+  }
 });
 $("window-select").addEventListener("change", async (event) => {
   state.window = Number(event.target.value);

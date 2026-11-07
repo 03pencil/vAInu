@@ -71,8 +71,8 @@ def test_physics_features_on_real_data() -> None:
     for column in PHYSICS_FEATURES:
         assert column in out.columns
 
-    # PUMP-04 (T2 full, flow+speed+power): exact quality, residual usable.
-    p4 = out[out["asset_id"] == "PUMP-04"]
+    # PUMP-02 (T2 full, flow+speed+power): exact quality, residual usable.
+    p4 = out[out["asset_id"] == "PUMP-02"]
     assert (p4["physics_quality"] == "exact").all()
     running = p4["operating_mode"] == "RUNNING"
     res = p4.loc[running, "physics_head_residual_m"]
@@ -89,15 +89,15 @@ def test_physics_features_on_real_data() -> None:
     assert p3["physics_head_residual_m"].isna().all()
     assert (p3["physics_quality"] == "none").all()
 
-    # PUMP-08 (T1 retrofit: suction/discharge but no flow): estimated flow.
-    p8 = out[out["asset_id"] == "PUMP-08"]
+    # PUMP-01 (T1 retrofit: suction/discharge but no flow): estimated flow.
+    p8 = out[out["asset_id"] == "PUMP-01"]
     p8_running = p8["operating_mode"] == "RUNNING"
     assert p8.loc[p8_running, "physics_flow_est_m3h"].notna().mean() > 0.5
     est = p8.loc[p8_running, "physics_flow_est_m3h"].dropna()
     assert est.between(0.0, 1200.0).all()
 
     # Thermal residuals exist where bearing instruments exist.
-    p6 = out[out["asset_id"] == "PUMP-06"]
+    p6 = out[out["asset_id"] == "PUMP-01"]
     assert p6["physics_bearing_residual_k"].notna().any()
     p1 = out[out["asset_id"] == "PUMP-01"]
     assert p1["physics_winding_residual_k"].isna().all()  # no winding channel

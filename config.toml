@@ -1,23 +1,17 @@
 # vAInu project configuration (stdlib tomllib, Python 3.11+).
-# Values derived from data/full. Do not hard-code these in Python files.
+# Values derived from data_3pumps. Do not hard-code these in Python files.
 
 [paths]
-# Root of the bundled test dataset. Use "data/full" or "data/starter".
-# The full tier stores telemetry as telemetry/asset_id=*/day=*/part-0.parquet
-# (1 s grid); the starter tier uses telemetry.csv.gz (10 s grid).
-# NOTE: this repo's data/full has no telemetry folder; point data_dir at a
-# provisioned copy of the full tier before running.
-data_dir = "data/full"
+# Root of the bundled dataset. data_3pumps is the filtered full tier with
+# only day 7 for PUMP-01..03 (1 s grid, 24 h each). The unfiltered source
+# stays in the participant bundle; data/full is metadata-only in this repo.
+data_dir = "data_3pumps"
 # Available tiers for quick switching.
-tiers = ["full", "starter"]
+tiers = ["full_3pumps", "full", "starter"]
 
 [assets]
-# All asset IDs found in data/full/assets.csv
-ids = [
-  "PUMP-01", "PUMP-02", "PUMP-03", "PUMP-04",
-  "PUMP-05", "PUMP-06", "PUMP-07", "PUMP-08",
-  "PUMP-09", "PUMP-10", "PUMP-11", "PUMP-12",
-]
+# Asset IDs in the filtered tier (PUMP-04..12 were removed).
+ids = ["PUMP-01", "PUMP-02", "PUMP-03"]
 
 [channels]
 # All sensor channels found across data/full/assets.csv (channels_available).
