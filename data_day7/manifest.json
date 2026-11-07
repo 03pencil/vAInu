@@ -1,0 +1,185 @@
+{
+  "dataset": "RETROFIT AI 2026 synthetic pump telemetry",
+  "synthetic": true,
+  "tier": "full",
+  "generator_version": "1.0.0",
+  "derived": {
+    "source_tier": "full",
+    "assets": [
+      "PUMP-01",
+      "PUMP-02",
+      "PUMP-03",
+      "PUMP-04",
+      "PUMP-05",
+      "PUMP-06",
+      "PUMP-07",
+      "PUMP-08",
+      "PUMP-09",
+      "PUMP-10",
+      "PUMP-11",
+      "PUMP-12"
+    ],
+    "day": {
+      "PUMP-01": "2025-08-17",
+      "PUMP-02": "2025-12-07",
+      "PUMP-03": "2026-03-08",
+      "PUMP-04": "2025-06-22",
+      "PUMP-05": "2026-01-25",
+      "PUMP-06": "2025-10-12",
+      "PUMP-07": "2025-05-18",
+      "PUMP-08": "2025-09-14",
+      "PUMP-09": "2026-02-15",
+      "PUMP-10": "2025-07-27",
+      "PUMP-11": "2026-04-26",
+      "PUMP-12": "2025-11-30"
+    }
+  },
+  "file_count": 26,
+  "total_bytes": 16811909,
+  "telemetry_rows": {
+    "PUMP-01": 86400,
+    "PUMP-02": 86400,
+    "PUMP-03": 86400,
+    "PUMP-04": 86400,
+    "PUMP-05": 86400,
+    "PUMP-06": 86400,
+    "PUMP-07": 86400,
+    "PUMP-08": 86400,
+    "PUMP-09": 86400,
+    "PUMP-10": 86400,
+    "PUMP-11": 86400,
+    "PUMP-12": 86400
+  },
+  "files": [
+    {
+      "path": "alarms.csv",
+      "bytes": 95,
+      "sha256": "decf001fe119e4120c4287b3f75063c30a8e1acfd0dca16f383339adc11944dc"
+    },
+    {
+      "path": "assets.csv",
+      "bytes": 6005,
+      "sha256": "bf80906062ee87861adcf0d94accbf303b49b6c8c4f9060bbd3d5318dbeaef69"
+    },
+    {
+      "path": "benign_windows_train_validation.csv",
+      "bytes": 4072,
+      "sha256": "97628bcac5e9a6cac6fa4bdc8495155207e1a8c6b5a4c2d1375a2cae6e7fa3f2"
+    },
+    {
+      "path": "data_dictionary.csv",
+      "bytes": 9439,
+      "sha256": "db816137b7e4b163ce990585ad2f5d1b0f45a4ddd8dc5e95efbf85857e248a8d"
+    },
+    {
+      "path": "events_train.csv",
+      "bytes": 2171,
+      "sha256": "be090e76c1598a3dd545959efc5959de1831d695405494c8d01ff3552d2181d4"
+    },
+    {
+      "path": "events_validation.csv",
+      "bytes": 982,
+      "sha256": "3af5d641391ea4c70d57959b0dcf1361257e3c5d353e23390c6902e329446f2e"
+    },
+    {
+      "path": "features_1min.parquet",
+      "bytes": 1905559,
+      "sha256": "a98ba89875a19829bd87b306d3e36d3ae5762b21da714c566b1afb96ec767125"
+    },
+    {
+      "path": "maintenance.csv",
+      "bytes": 1266,
+      "sha256": "8bac36b926d0a9a8a370fffa88e26f755b0b32aeca67f68b1b3e5a394dd5c7fa"
+    },
+    {
+      "path": "operating_context.csv",
+      "bytes": 1657801,
+      "sha256": "335878a227361e7f4bf7fb48e3d8b269a81aa90d38973329d97caade3ac658dd"
+    },
+    {
+      "path": "provenance.md",
+      "bytes": 765,
+      "sha256": "3186e140e56498735e01b5dd00b9f7a4fddc45223ad3a3101634edbe4af54870"
+    },
+    {
+      "path": "schema.json",
+      "bytes": 21979,
+      "sha256": "ab07d61da7c6cecfcdef6afb823303674cae51512c46a9c32743400f273565ce"
+    },
+    {
+      "path": "simulation_assumptions.md",
+      "bytes": 2859,
+      "sha256": "3955f7db21a3769f25b0bc6a2d3afff82b9c6709236dee39fb369dadef25f14b"
+    },
+    {
+      "path": "telemetry/asset_id=PUMP-01/day=2025-08-17/part-0.parquet",
+      "bytes": 766944,
+      "sha256": "67893271dae0016520ecfdd462f7ebf25078e5dad99f14041a72b6e6af1d1fdf"
+    },
+    {
+      "path": "telemetry/asset_id=PUMP-02/day=2025-12-07/part-0.parquet",
+      "bytes": 1109858,
+      "sha256": "74f4e069c90e43f4a41260552032c129fceede704f8083749469ac000680125b"
+    },
+    {
+      "path": "telemetry/asset_id=PUMP-03/day=2026-03-08/part-0.parquet",
+      "bytes": 562729,
+      "sha256": "9fc6ba100a0efea5ac7d15375b2add07260f512d07482ee9b968759506998aec"
+    },
+    {
+      "path": "telemetry/asset_id=PUMP-04/day=2025-06-22/part-0.parquet",
+      "bytes": 1207035,
+      "sha256": "464710b0da7971fb9eb6e7a4548f7fc7a88caf2b008df1df30c7a28b097216c0"
+    },
+    {
+      "path": "telemetry/asset_id=PUMP-05/day=2026-01-25/part-0.parquet",
+      "bytes": 525256,
+      "sha256": "8a74655b02383b669179787df36f5b268ab1aaea69040ea32964b62e76759138"
+    },
+    {
+      "path": "telemetry/asset_id=PUMP-06/day=2025-10-12/part-0.parquet",
+      "bytes": 675353,
+      "sha256": "54884d2337342b50d2971256bbdf5dc702a6e372e6068aad1291cb7fc8313a48"
+    },
+    {
+      "path": "telemetry/asset_id=PUMP-07/day=2025-05-18/part-0.parquet",
+      "bytes": 1122074,
+      "sha256": "b93e2d7c0025801c3c09d702942ac33f39188a47975ed5b4bac4b9d23b3acc73"
+    },
+    {
+      "path": "telemetry/asset_id=PUMP-08/day=2025-09-14/part-0.parquet",
+      "bytes": 737468,
+      "sha256": "ba44273bceff41d36f860985fd1885053c2b04656abe8ab04563571b1d38422a"
+    },
+    {
+      "path": "telemetry/asset_id=PUMP-09/day=2026-02-15/part-0.parquet",
+      "bytes": 1126250,
+      "sha256": "57055b5e611ecbd06f43eb36d57bcf7e0d118c998249ca507e7f70c305649f3a"
+    },
+    {
+      "path": "telemetry/asset_id=PUMP-10/day=2025-07-27/part-0.parquet",
+      "bytes": 739600,
+      "sha256": "2545aa7586c4629466d6813eb843f4d2ab8af03b7a75a0a82ed48b21495d9ddb"
+    },
+    {
+      "path": "telemetry/asset_id=PUMP-11/day=2026-04-26/part-0.parquet",
+      "bytes": 646417,
+      "sha256": "d3b94d73b558514d6156cf03f5fc0ba328e552608409e2e9cf4182bc835e8043"
+    },
+    {
+      "path": "telemetry/asset_id=PUMP-12/day=2025-11-30/part-0.parquet",
+      "bytes": 1253974,
+      "sha256": "ded8272c24b582d05333933ee03cb1718931bd63e5e7fc155ce333ddf196df73"
+    },
+    {
+      "path": "units.md",
+      "bytes": 1769,
+      "sha256": "54eda64ca55093903af3f6b3ceb89158ebcb42e60d6129beb8eb997f068fbc3c"
+    },
+    {
+      "path": "vibration_snapshots.parquet",
+      "bytes": 2724189,
+      "sha256": "5acea723bd531d026c30129273f800528750edc5a0f9e3dfdc9d9e694b1bbf61"
+    }
+  ]
+}
