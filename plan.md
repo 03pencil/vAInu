@@ -23,18 +23,18 @@ Minimal hardware only — see [`bom.md`](bom.md). Key notions:
 
 ## Phases
 
-1. Explore data: load starter telemetry with pandas, inspect channels, asset tiers.
-2. Baseline analysis: compute simple stats, plots (matplotlib) per asset/channel.
-3. Feature engineering: rolling stats, vibration trends, pressure/flow ratios.
-4. Model: train a lightweight anomaly/fault detector on benign windows; validate on events.
-5. Shrink to smoll for edge deployment (GGUF via llama.cpp) running on UNO Q MPU.
+1. Explore data: load starter telemetry with pandas, inspect channels, asset tiers. — **DONE** (M0/M1 boxes in [`to-do.md`](to-do.md))
+2. Baseline analysis: compute simple stats, plots (matplotlib) per asset/channel. — stats + labeled windows + KPI gate done; plots still pending
+3. Feature engineering: rolling stats, vibration trends, pressure/flow ratios. — rolling robust z done; physics residuals / ratios pending (Layer 1)
+4. Model: train a lightweight anomaly/fault detector on benign windows; validate on events. — robust envelope validated (20/20 events); learned detector pending
+5. Shrink to smoll for edge deployment (GGUF via llama.cpp) running on UNO Q MPU. — applies to SmolLM itself; detector stays plain Python (see M5 in to-do)
 6. Deploy: App Lab app on UNO Q; MCU receives sensor data from logic box, MPU runs inference, outputs analysed data.
 7. Test on hardware; iterate.
 
 ## Milestones
 
-- M1: Data exploration notebook/script done.
-- M2: Baseline model metrics on validation.
+- M1: Data exploration notebook/script done. — **done**
+- M2: Baseline model metrics on validation. — baseline KPIs recorded (lead time + FAR)
 - M3: App Lab app running on UNO Q (receive -> infer -> output).
 - M4: End-to-end demo: pumps -> logic box -> UNO Q -> minimal web UI.
 
@@ -51,15 +51,23 @@ telemetry -> feature math (numpy/pandas, deterministic)
           -> prediction log -> periodic retrain -> improving over time
 ```
 
+Progress: layer 1 item 1 (healthy envelope + fleet fallback + rolling
+second surface) is implemented and KPI-gated; layer 1 items 2-4, layer 2,
+layer 3 and the feedback loop are pending — track them in
+[`to-do.md`](to-do.md).
+
 Stack rule: pure numpy/scipy/pandas (no sklearn). LLMs already available
 locally via `python3 ~/chain_models.py <mode> "<text>"` (ollama:
-smollm2:135m -> mistral -> gemma3:e2b).
+smollm2:135m -> mistral -> gemma4:e2b).
 
 ### Layer 1 - predictive math (deterministic)
 
 1. Adaptive healthy envelope: per asset x channel x operating_mode,
-   robust median/MAD from benign windows + own recent history; adaptive
-   z-score conditioned on `operating_context.duty_demand_pct` (load
+   robust median/MAD from benign windows + own recent history;
+   z-score is mode-conditioned. IMPLEMENTED: robust_stats +
+   modified_zscores + fleet fallback (merged_stats, profile-level) +
+   self-adaptive rolling second surface (rolling_robust_z). PENDING:
+   conditioning on `operating_context.duty_demand_pct` (load
    matters: normal at 60% demand differs from 90%).
 2. Physics residuals (gold features, parameters come from `assets.csv`):
    - hydraulic residual: measured head vs pump-curve H(r,Q), up with

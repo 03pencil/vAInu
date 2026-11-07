@@ -4,14 +4,23 @@
 > anything inside it. See `skills/python-style.md` and `skill_data.md`.
 
 ## M1: Data exploration
-- [x] Develop .py files (data_input, math, ui, main) into working implementations.
+- [x] Working implementations: `data_input`, `math`, `main` done;
+  `ui.py` still a stub (matplotlib plots pending, see M2).
 - [x] Set up Python environment / install pandas, matplotlib.
 - [x] Load telemetry from the configured tier (full/starter) into a DataFrame.
 - [x] Inspect channel names and data types.
-- [ ] Inspect asset tiers and counts.
+- [x] Inspect asset tiers and counts (`main.py` prints instrumentation
+  tiers + channel counts; 5 assets on starter tier: 3x T1_RETROFIT,
+  1x T0_LEGACY, 1x T2_FULL, split train x3 / validation x1).
 - [x] Save exploration script (`tests/test_data_input.py` — exploration
   facts land there and in `main.py` output).
 - [x] Confirm all settings come from `config.toml` — no hard-coding.
+
+### Build order (next steps)
+1. Physics residuals (pump-curve features) — expected to lift the
+   weak detections (cavitation leads are ~0.0 h today).
+2. Trend extrapolation -> time-to-alarm (long-scale prediction).
+3. FAR reduction toward < 2% (debounce/state machine).
 
 ### Findings (2026-11-07)
 - [x] Record the data blocker in `plan.md`: `data/full` is missing the
@@ -55,11 +64,17 @@
 - [ ] Store feature dataset.
 
 ## M4: Model
-- [ ] Define prediction algorithm (anomaly/fault scoring logic for SmolLM).
-- [ ] Label benign vs event windows.
-- [ ] Train lightweight anomaly/fault detector on benign windows.
-- [ ] Validate on event windows.
-- [ ] Record metrics (precision, recall, F1).
+- [x] Define prediction algorithm (anomaly/fault scoring logic for the
+  LLM): deterministic z-score scoring defined + implemented; LLM-side
+  verdict wiring tracked in the Layer 3 boxes below.
+- [x] Label benign vs event windows (`src/labels.py`).
+- [ ] Train lightweight anomaly/fault detector on benign windows —
+  robust envelope detector done; Mahalanobis + classifier pending
+  (Layer 2 boxes).
+- [x] Validate on event windows (sanity gate evaluates every labeled
+  event on train + validation assets).
+- [ ] Record metrics (precision, recall, F1) — currently lead time +
+  FAR are recorded; confusion-matrix metrics once a classifier exists.
 
 ### Layer 1 math (deterministic, numpy only)
 - [x] Robust healthy envelope: median/MAD per asset x channel x operating
@@ -82,8 +97,9 @@ Recorded so later layers can be compared against them:
   10/10 deadline-bearing events caught before deadline, median lead
   1.6 h, best leads 119.7 h (PUMP-04 BEARING_WEAR), 100.2 h (IMBALANCE),
   38.3 h (PUMP-08 SUCTION_STRAINER_CLOGGING), 31.8 h (PUMP-06 clogging).
-- [x] Benign false-alarm rate: 6.4% (envelope surface),
-  8.0% (rolling surface), thresholds z=3 smoothed over 60 samples.
+- [x] Benign false-alarm rate (z=3, smoothed over 60 samples):
+  6.4% envelope surface only, 8.0% rolling surface only,
+  13.4% union of both surfaces (738 / 5,504 benign rows).
 - [ ] Reduce FAR (debounce/state machine, richer features) — target < 2%.
 
 ### Layer 2 detector (learned, numpy only)
