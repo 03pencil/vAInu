@@ -43,6 +43,38 @@ def get_smoothing_window(cfg: dict | None = None) -> int:
     return cfg.get("analysis", {}).get("smoothing_window", 60)
 
 
+def get_trend_config(cfg: dict | None = None) -> dict:
+    """[trend] section with defaults: bin_minutes, trailing_hours,
+    min_bin_count, min_fit_points."""
+    if cfg is None:
+        cfg = load_config()
+    section = cfg.get("trend", {})
+    return {
+        "bin_minutes": int(section.get("bin_minutes", 10)),
+        "trailing_hours": float(section.get("trailing_hours", 12.0)),
+        "min_bin_count": int(section.get("min_bin_count", 2)),
+        "min_fit_points": int(section.get("min_fit_points", 36)),
+    }
+
+
+def get_limits_config(cfg: dict | None = None) -> dict:
+    """[limits] section: static alarm limits per channel (key = channel)."""
+    if cfg is None:
+        cfg = load_config()
+    return dict(cfg.get("limits", {}))
+
+
+def get_debounce_config(cfg: dict | None = None) -> dict:
+    """[debounce] section: confirm_samples, escalate_samples."""
+    if cfg is None:
+        cfg = load_config()
+    section = cfg.get("debounce", {})
+    return {
+        "confirm_samples": int(section.get("confirm_samples", 18)),
+        "escalate_samples": int(section.get("escalate_samples", 180)),
+    }
+
+
 def get_asset_ids(cfg: dict | None = None) -> list[str]:
     if cfg is None:
         cfg = load_config()

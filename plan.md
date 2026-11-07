@@ -4,6 +4,74 @@
 
 Pump sensors send telemetry to a logic box, which delivers it to an Arduino UNO Q. The UNO Q runs a local LLM and outputs analysed data. The Arduino only receives data from the pump logic circuit and outputs results elsewhere; it has no other inbound connections.
 
+## Challenge & evaluation
+
+vAInu is built for **RETROFIT AI — Make Existing Machines Intelligent** (Since AI
+Hackathon 2026, Turku; challenge owner Business Turku, technical sparring
+partner Elomatic). Full rules live in the organizer package:
+`/home/koodikone/since/BusinessTurku_SinceAI2026_FINAL_BUILDER_PUBLISH/RETROFIT_AI_PARTICIPANTS_2026/`
+(`CHALLENGE_BRIEF.md`, `BENCHMARK_RULES.md`, `TECHNICAL_MODEL.md`,
+`RETROFIT_FEASIBILITY.md`). The task: turn existing / low-cost sensor data from
+an existing motor-driven cooling-water pump into an operator-assist layer that
+detects developing issues early, explains evidence and uncertainty, and
+recommends human-approved interventions — **no hardware writes, no production
+control, read-only integration, advisory only**.
+
+### Official judging criteria — how vAInu addresses each
+
+| Criterion | Weight | vAInu workstream |
+|---|---|---|
+| Business usefulness | 25 % | Tie early-warning lead time and fault-type recall to avoided unplanned stops vs planned repairs (business-case logic in `RETROFIT_FEASIBILITY.md`: ~EUR 4.5 k installed, ~1 yr illustrative payback). Alerts must be actionable by a watchkeeper / maintenance planner: evidence + recommendation + stated uncertainty, not a bare score. |
+| Technical validity & measured performance | 25 % | Measured composite score (below). Targets: beat baseline **B1 mode-aware z (78.0 validation)**. KPIs tracked in `scripts/sanity_gate.py` (lead time vs deadline, benign FAR) plus the benchmark scorer (F1, timeliness, fault-type recall, class recall, alert burden). |
+| Reliability / safety | 20 % | Sensor-vs-machine fault separation (a drifting transmitter must not trigger a machine claim or hide a real fault); calibrated confidence; honest `UNKNOWN` when the cause is unclear; advisory-only; no claims of certified safety or class approval. |
+| Low-cost retrofit feasibility & transfer | 20 % | Read-only integration (UNO Q receives from logic box, no other inbound), edge/offline detection with local buffering, per-tier detection strategies (T0 legacy / T1 retrofit / T2 full, ~EUR 2.1–3.1 k BOM per pump), transfer story to other rotating machines via profile + tier-aware envelopes. |
+| Working demo & clarity | 10 % | Minimal web UI on the local network showing live values, predictions, evidence and uncertainty; short demo script; honest limitations (synthetic data, no field evidence). **The UI is built by a teammate** — this repo treats it as an interface contract: backend emits structured predictions (fault type / class / confidence / evidence), UI consumes them. |
+
+### Measured performance target (composite score 0–100)
+
+```
+composite = 100 x (0.35 F1 + 0.20 timeliness + 0.25 fault-type recall
+                    + 0.10 class recall + 0.10 alert burden)
+```
+
+- Reference baselines (validation split): B0 SCADA alarms 23.1, B1 mode-aware z
+  **78.0**, B3 isolation forest 69.2. **Target: beat B1.**
+- Submission format: `submission_template/predictions_template.csv` —
+  `asset_id, alert_time_utc, event_class (MACHINE|SENSOR), fault_type,
+  confidence (0-1), evidence, recommended_action`.
+- Scoring semantics that shape the design: alerts < 5 min apart on one asset
+  merge into a burst (a burst naming several fault types earns no fault-type
+  credit); excess repeats (> 1 reminder per 12 h) count as false alerts;
+  event windows start at detectable − 6 h; lead time = deadline − first alert.
+- Hard rules: **causal operation only** (an alert at time t may use data
+  timestamps <= t; organizers may re-run on test telemetry truncated at random
+  cut points), no tuning or hand-labelling on test data. Train = PUMP-01..07,
+  validation = PUMP-08/09, test = PUMP-10..12 (unlabeled).
+
+### Constraints the challenge imposes on the architecture
+
+- **Instrumentation tiers decide what is detectable.** T0 legacy pumps cannot
+  see early bearing damage (no vibration channel); T1 retrofit updates the
+  wireless vibration/temperature sensor only every 300 s, so short events can
+  hide between samples; T2 full sees everything except direct seal leak.
+  Detection strategy must be per-tier: on T0, avoid vibration-based claims
+  and rely on hydraulic residuals; on T1, mask sparse NaNs natively.
+- **Sensor-vs-machine firewall.** Fault taxonomy: MACHINE (BEARING_WEAR,
+  SUCTION_STRAINER_CLOGGING, CAVITATION, DISCHARGE_RESTRICTION, MISALIGNMENT,
+  IMBALANCE, IMPELLER_WEAR, AIR_ENTRAINMENT) vs SENSOR (SENSOR_DRIFT,
+  SENSOR_STUCK, SENSOR_CALIBRATION_SHIFT, SENSOR_NOISE_SPIKES,
+  COMMUNICATION_LOSS) vs UNKNOWN. Test data include a drifting suction
+  transmitter masking a real clog — the detector must flag the channel as
+  suspect instead of claiming a machine fault.
+- **Operating-condition normalization.** Deviations must be judged per
+  operating mode / duty demand / speed regime; start-up ramps, load changes,
+  heavy weather and voltage sags are labeled benign windows and must not
+  become alerts (they erode operator trust and cost points).
+- **False-alert economy.** The composite penalizes alert burden; a low-
+  confidence `UNKNOWN` alert is safer than a confidently wrong fault type.
+
+Per-criteria tasks are tracked in [`to-do.md`](to-do.md).
+
 ## Architecture
 
 - Pump sensors -> logic box (collect/forward telemetry).
