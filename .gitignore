@@ -4,6 +4,7 @@ __pycache__/
 .venv/
 venv/
 .env
+pruna_api_key.txt
 
 # Data outputs
 *.parquet
@@ -25,3 +26,6 @@ Thumbs.db
 
 # Rebuild cache (finished alarm surface)
 /cache/
+
+# Pilot output (state.json, predictions.jsonl)
+/pilot/
