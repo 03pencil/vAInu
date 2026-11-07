@@ -1,6 +1,7 @@
 # To-Do
 
 ## M1: Data exploration
+- [ ] Develop .py files (data_input, math, ui, main) into working implementations.
 - [ ] Set up Python environment / install pandas, matplotlib.
 - [ ] Load starter telemetry into a DataFrame.
 - [ ] Inspect channel names and data types.
