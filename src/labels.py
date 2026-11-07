@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from .config import get_data_dir
@@ -81,36 +82,40 @@ def label_telemetry(
 
     out = df.copy()
     ts = out["timestamp_utc"]
-    label = pd.Series(LABEL_UNKNOWN, index=out.index, dtype="string")
-    event_id = pd.Series("", index=out.index, dtype="string")
+    label = np.full(len(out), LABEL_UNKNOWN, dtype=object)
+    event_id = np.full(len(out), "", dtype=object)
+    # Each asset's rows are contiguous, so windows are matched within one
+    # asset's slice instead of scanning the whole telemetry frame.
+    positions = out.groupby("asset_id", sort=False).indices
 
     # 1) confirmed-good windows (strong negatives)
     for _, window in benign.iterrows():
-        mask = (
-            (out["asset_id"] == window["asset_id"])
-            & (ts >= window["start_utc"])
-            & (ts <= window["end_utc"])
-        )
-        label[mask] = LABEL_BENIGN
+        idx = positions.get(window["asset_id"])
+        if idx is None:
+            continue
+        sub = ts.iloc[idx]
+        inside = (sub >= window["start_utc"]) & (sub <= window["end_utc"])
+        label[idx[inside.to_numpy()]] = LABEL_BENIGN
 
     # 2) fault episodes; open-ended events run to the end of the data
     max_ts = ts.max()
     onset = events["onset_utc"].fillna(max_ts)
     end = events["end_utc"].fillna(max_ts)
     for i, event in events.iterrows():
-        base = (
-            (out["asset_id"] == event["asset_id"])
-            & (ts >= onset[i])
-            & (ts <= end[i])
-        )
+        idx = positions.get(event["asset_id"])
+        if idx is None:
+            continue
+        sub = ts.iloc[idx]
+        base = idx[((sub >= onset[i]) & (sub <= end[i])).to_numpy()]
         event_id[base] = event["event_id"]
         detectable = event["detectable_utc"]
         if (not bool(event["observable"])) or pd.isna(detectable):
             label[base] = LABEL_FAULT_UNDETECTABLE
             continue
-        label[base & (ts < detectable)] = LABEL_FAULT_WARMING
-        label[base & (ts >= detectable)] = LABEL_FAULT_DETECTABLE
+        before = (ts.iloc[base] < detectable).to_numpy()
+        label[base[before]] = LABEL_FAULT_WARMING
+        label[base[~before]] = LABEL_FAULT_DETECTABLE
 
-    out[LABEL_COLUMN] = label
-    out[EVENT_ID_COLUMN] = event_id
+    out[LABEL_COLUMN] = pd.Series(label, index=out.index, dtype="string")
+    out[EVENT_ID_COLUMN] = pd.Series(event_id, index=out.index, dtype="string")
     return out
