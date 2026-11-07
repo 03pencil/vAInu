@@ -14,8 +14,14 @@ ids = [
 ]
 
 [channels]
-# Sensor channels analysed by the pipeline.
-names = ["pressure", "temperature", "vibration", "flow"]
+# All sensor channels found across data/full/assets.csv (channels_available).
+names = [
+  "ambient_temp_c", "bearing_temp_c", "discharge_pressure_kpa",
+  "flow_m3_h", "fluid_temp_c", "motor_current_a", "motor_power_kw",
+  "motor_speed_rpm", "motor_winding_temp_c", "suction_pressure_kpa",
+  "valve_position_pct", "vibration_accel_rms_g", "vibration_crest_factor",
+  "vibration_rms_mm_s",
+]
 
 [analysis]
 # Window size for rolling statistics.
