@@ -10,6 +10,7 @@ replace the replay source without touching detection code.
 from __future__ import annotations
 
 import json
+import sys
 from typing import Iterator
 
 import pandas as pd
@@ -52,6 +53,43 @@ def parse_frame(line: str) -> dict:
     sample = dict(raw)
     sample["timestamp_utc"] = pd.Timestamp(raw["timestamp_utc"], tz="UTC")
     return sample
+
+
+def to_frame(row: dict, channels: list[str]) -> dict:
+    """Build one UART frame (JSON-safe, NaN sent as null) from a telemetry row."""
+    frame = {
+        "asset_id": str(row["asset_id"]),
+        "timestamp_utc": pd.Timestamp(row["timestamp_utc"]).isoformat(),
+        "operating_mode": str(row["operating_mode"]),
+    }
+    for channel in channels:
+        value = row.get(channel)
+        frame[channel] = None if value is None or pd.isna(value) else float(value)
+    return frame
+
+
+class StdinFeed:
+    """Reads frames (one JSON object per line) from a text stream, such as a pipe or serial port.
+
+    Malformed lines are skipped and counted in `bad_frames`; the first error is kept
+    in `first_error` so the operator can see what went wrong.
+    """
+
+    def __init__(self, stream=None) -> None:
+        self.stream = stream if stream is not None else sys.stdin
+        self.bad_frames = 0
+        self.first_error: str | None = None
+
+    def __iter__(self) -> Iterator[dict]:
+        for line in self.stream:
+            if not line.strip():
+                continue
+            try:
+                yield parse_frame(line)
+            except ValueError as exc:
+                self.bad_frames += 1
+                if self.first_error is None:
+                    self.first_error = str(exc)
 
 
 class UartFeed:
