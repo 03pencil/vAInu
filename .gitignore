@@ -21,3 +21,6 @@ Thumbs.db
 # Folders
 
 
+
+# Pilot output (state.json, predictions.jsonl)
+/pilot/
