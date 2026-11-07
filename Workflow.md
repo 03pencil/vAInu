@@ -8,9 +8,9 @@ Full setup steps are in [`arduino_uno_q_install.md`](arduino_uno_q_install.md).
 | Item | Value |
 |------|-------|
 | IP address | `10.20.3.13` (from `~/.ssh/known_hosts`; confirm with `hostname -I` on the board) |
-| mDNS name | `<boardname>.local` — the name chosen in the App Lab wizard (not yet confirmed; `uno-q.local` does not resolve) |
+| mDNS name | `<boardname>.local` — the name chosen in the App Lab wizard (exemple; `uno-q.local` does not resolve) |
 | SSH user | `arduino` |
-| SSH | `ssh arduino@10.20.3.13` (or `ssh arduino@<boardname>.local`) |
+| SSH | `ssh arduino@00.00.0.00` (or `ssh arduino@<boardname>.local`) |
 | ADB fallback | `adb devices` then `adb shell` over USB-C data cable (password `arduino` if the wizard was not run) |
 | Ollama API (board only) | `http://127.0.0.1:11434` |
 
