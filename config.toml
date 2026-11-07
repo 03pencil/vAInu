@@ -3,7 +3,10 @@
 
 [paths]
 # Root of the bundled test dataset. Use "data/full" or "data/starter".
-data_dir = "data/full"
+# NOTE: data/full currently lacks the telemetry parquets (manifest.json
+# lists them, they are not on disk) - starter is the only tier with
+# usable telemetry until the full files are added.
+data_dir = "data/starter"
 # Available tiers for quick switching.
 tiers = ["full", "starter"]
 

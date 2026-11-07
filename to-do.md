@@ -5,12 +5,39 @@
 
 ## M1: Data exploration
 - [ ] Develop .py files (data_input, math, ui, main) into working implementations.
-- [ ] Set up Python environment / install pandas, matplotlib.
-- [ ] Load telemetry from the configured tier (full/starter) into a DataFrame.
-- [ ] Inspect channel names and data types.
+- [x] Set up Python environment / install pandas, matplotlib.
+- [x] Load telemetry from the configured tier (full/starter) into a DataFrame.
+- [x] Inspect channel names and data types.
 - [ ] Inspect asset tiers and counts.
-- [ ] Save exploration notebook/script (outside `data/`).
-- [ ] Confirm all settings come from `config.toml` — no hard-coding.
+- [x] Save exploration script (`tests/test_data_input.py` — exploration
+  facts land there and in `main.py` output).
+- [x] Confirm all settings come from `config.toml` — no hard-coding.
+
+### Findings (2026-11-07)
+- [x] Record the data blocker in `plan.md`: `data/full` is missing the
+  telemetry parquets / features_1min.parquet / vibration_snapshots
+  (manifest.json claims them, they are not on disk). Only real telemetry
+  is `data/starter/telemetry.csv.gz` (10 s grid).
+- [x] Decide the stack rule: pure numpy/scipy/pandas — no sklearn.
+- [x] Record the three-layer prediction architecture in `plan.md`
+  (features -> detector -> SmolLM chain -> feedback loop).
+- [x] Switch `config.toml` `data_dir` to `data/starter` until the full
+  parquet files exist.
+
+## M0: Unblock the data layer (pure numpy, prerequisite for everything)
+- [x] `data_input.load_telemetry()`: read `telemetry.csv.gz` with pandas,
+  parse `timestamp_utc` as UTC, sort by asset_id + timestamp.
+- [x] Keep `quality_flags` as an int bitmask + helpers
+  (`has_flag`, per-bit names from data_dictionary: 1 COMM_LOSS,
+  2 OUT_OF_RANGE, 4 STALE, 8 BAD_SENSOR_STATUS, 16 STARTUP_INHIBIT).
+- [x] Route missing full-tier parquets gracefully (clear error, fallback
+  ready when files arrive).
+- [x] `load_assets()` + per-asset channel mask from `channels_available`
+  (T0 pumps have only 4 channels — honor instrumentation tiers).
+- [x] Rework `split_channels()` for the wide-format telemetry
+  (long-format `channel` column does not exist).
+- [x] Verify end-to-end via `main.py` on the starter tier
+  (301,393 rows, 5 assets; `tests/test_data_input.py` all pass).
 
 ## M2: Baseline analysis
 - [ ] Compute basic stats (mean, std, min, max) per asset/channel.
@@ -31,10 +58,40 @@
 - [ ] Validate on event windows.
 - [ ] Record metrics (precision, recall, F1).
 
+### Layer 1 math (deterministic, numpy only)
+- [ ] Robust healthy envelope: median/MAD per asset x channel x operating mode.
+- [ ] Condition channel behavior on `operating_context.duty_demand_pct`.
+- [ ] Physics residuals from `assets.csv` curve parameters: hydraulic
+  residual (H vs flow at speed ratio), efficiency proxy, strainer dP,
+  thermal rise lag (tau from simulation_assumptions.md).
+- [ ] Trend extrapolation: trailing 6-24 h drift fit -> time-to-alarm /
+  time-to-trip (long-scale prediction) with uncertainty band.
+- [ ] Fault-type likelihood vector from evidence-channel signatures.
+
+### Layer 2 detector (learned, numpy only)
+- [ ] Mahalanobis anomaly score vs benign windows (numpy only).
+- [ ] Hand-written logistic-regression fault classifier (GD/lstsq).
+- [ ] Horizons: 10-min / 1 h / days (RUL-style); state-machine debounce.
+
+### Layer 3 SmolLM chain
+- [ ] Situation-report serializer (fixed ~200-token text format).
+- [ ] Wire `~/chain_models.py` analysis mode -> structured JSON verdict
+  constrained to the fault taxonomy from events_train.csv.
+- [ ] Fuse `maintenance.csv operator_observation` free text.
+
+### Feedback loop (improving over time)
+- [ ] Prediction log (inputs, score, RUL claim, timestamp).
+- [ ] Outcome joins: alarms (fast), events deadlines (medium),
+  maintenance CONFIRMED (ground truth).
+- [ ] Periodic recalibration + learned bias correction per fault type.
+- [ ] KPI: early-warning lead time vs detectable_utc, shown improving.
+
 ## M5: Shrink for edge (GGUF)
 - [ ] Export model to GGUF via llama.cpp.
 - [ ] Quantize to smallest viable size.
 - [ ] Benchmark inference speed on target hardware.
+- [x] Clarified: GGUF applies to SmolLM itself; the detector is classical
+  math/ML and runs as plain Python on the UNO Q MPU.
 
 ## M6: Deploy on UNO Q
 - [ ] Create App Lab app skeleton.

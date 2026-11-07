@@ -37,3 +37,88 @@ Minimal hardware only — see [`bom.md`](bom.md). Key notions:
 - M2: Baseline model metrics on validation.
 - M3: App Lab app running on UNO Q (receive -> infer -> output).
 - M4: End-to-end demo: pumps -> logic box -> UNO Q -> minimal web UI.
+
+## Prediction architecture (three layers)
+
+The LLM must not do the numeric forecasting itself. It sits on top as the
+reasoning / narration layer:
+
+```
+telemetry -> feature math (numpy/pandas, deterministic)
+          -> small detector (scores + time-to-limit forecast)
+          -> compact situation report (templated text)
+          -> SmolLM chain: diagnosis + recommendation + confidence (JSON)
+          -> prediction log -> periodic retrain -> improving over time
+```
+
+Stack rule: pure numpy/scipy/pandas (no sklearn). LLMs already available
+locally via `python3 ~/chain_models.py <mode> "<text>"` (ollama:
+smollm2:135m -> mistral -> gemma3:e2b).
+
+### Layer 1 - predictive math (deterministic)
+
+1. Adaptive healthy envelope: per asset x channel x operating_mode,
+   robust median/MAD from benign windows + own recent history; adaptive
+   z-score conditioned on `operating_context.duty_demand_pct` (load
+   matters: normal at 60% demand differs from 90%).
+2. Physics residuals (gold features, parameters come from `assets.csv`):
+   - hydraulic residual: measured head vs pump-curve H(r,Q), up with
+     DISCHARGE_RESTRICTION, down with IMPPELLER_WEAR
+   - efficiency proxy: hydraulic power / motor_power_kw
+   - strainer dP signal: suction pressure deviation
+   - thermal rise with first-order lag (bearing/winding tau from
+     simulation_assumptions.md)
+3. Trend extrapolation -> time-to-limit (long-scale prediction): fit
+   drift over trailing 6-24 h, solve crossing of alarm/trip limits,
+   output tz + uncertainty band -> "vibration hits alarm in ~38 h".
+4. Fault-type likelihood vector from evidence signatures
+   (events `evidence_channels` = which channels light up per fault).
+
+### Layer 2 - small learned detector
+
+- Mahalanobis anomaly score vs benign windows (numpy, no deps).
+- Fault classifier (logistic regression / GD) over 10-min window
+  features, labeled via event interval joins.
+- Horizons: 10-min (fast anomalies), 1 h (trends), days (RUL-style).
+- State machine debouncing (ringing -> confirmed -> escalating).
+
+### Layer 3 - SmolLM chain (reasoning + narration)
+
+- Python summarizes windows into a fixed ~200-token report.
+- chain_models.py analysis mode -> structured JSON verdict:
+  {fault_suspected, evidence, recommended_action, urgency, confidence},
+  constrained to the fault taxonomy from events_train.csv.
+- Fuses free-text `maintenance.csv operator_observation` (may be wrong -
+  demo of LLM judgment vs rule engine).
+
+### Improving over time (feedback loop)
+
+- Log every prediction (inputs, score, RUL claim, timestamp).
+- Outcomes: alarms raised/cleared (fast), events end/deadline (medium),
+  maintenance CONFIRMED diagnosis (slow ground truth).
+- Periodic recalibration: refresh envelopes, refit classifier, learn
+  trend->time-to-limit bias correction per fault type.
+- KPI on the web UI: early-warning lead time (detection time vs
+  detectable_utc) improving week over week.
+
+### Data blocker (found 2026-11-07)
+
+- `data/full` is missing the heavy files its manifest.json claims
+  (telemetry parquets, features_1min.parquet, vibration_snapshots).
+- Only real telemetry on disk: `data/starter/telemetry.csv.gz` (10 s grid).
+- Therefore config.toml points at `data/starter` until full parquets arrive.
+- Sparse channels (e.g. bearing temp every 300 s on T1 retrofit) are
+  NaN-heavy; all math must mask NaN natively.
+
+## Phase 1 - data foundation (pure numpy)
+
+1. `data_input.load_telemetry()`: read telemetry.csv.gz with pandas, UTC
+   timestamp parsing, sorted by asset/time, quality_flags as int mask.
+2. Asset/channel masks from `assets.channels_available`.
+3. Labeled-window alignment: benign + event intervals -> derived label
+   per row (benign / pre-event / active / post-repair).
+4. First math: robust stats (median/MAD), rolling robust z-scores,
+   10-min window aggregation (matches benchmark detectability).
+5. Sanity gate: lead time vs detectable_utc + benign false-alarm rate
+   reported for a few labeled events. These are the KPIs all later
+   layers must beat.
