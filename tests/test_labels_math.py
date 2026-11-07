@@ -60,10 +60,11 @@ def test_robust_stats_nan_safe() -> None:
     stats = robust_stats(df, channels)
     # Sparse channels still get stats where data exists; missing ones NaN.
     assert stats["median"]["discharge_pressure_kpa"].notna().all()
-    # MAD defined exactly where median is defined (observed values only).
+    # MAD defined exactly where median is defined (observed values only),
+    # and non-negative; 0 is legitimate for tiny groups (e.g. 1-row modes).
     bearing = stats["mad"]["bearing_temp_c"]
     assert bearing.notna().equals(stats["median"]["bearing_temp_c"].notna())
-    assert (bearing.dropna() > 0).all()
+    assert (bearing.dropna() >= 0).all()
 
 
 def test_modified_zscores_shape_and_outliers() -> None:

@@ -34,10 +34,14 @@ See [`plan.md`](plan.md) for the full architecture and roadmap, and [`to-do.md`]
 - `config.toml` — all project settings (paths, tiers, assets, channels, analysis).
 - `main.py` — entry point; orchestrates the modules in `src/`.
 - `src/` — library code:
-  - `data_input.py` — load and split telemetry.
-  - `math.py` — statistics / algorithmic helpers.
+  - `data_input.py` — load and split telemetry (+ asset nameplate joins, quality-flag helpers).
+  - `labels.py` — aligns event / benign-window labels onto telemetry rows.
+  - `math.py` — robust statistics, modified z-scores, group-aware rolling helpers.
   - `ui.py` — matplotlib plotting helpers.
   - `config.py` — reads `config.toml`.
+- `scripts/` — runnable pipelines:
+  - `sanity_gate.py` — baseline KPI gate: benign false-alarm rate + early-warning lead time vs the benchmark's own detection clock.
+- `tests/` — plain-assert test scripts (run with `.venv/bin/python tests/test_*.py`).
 - `data/` — pump telemetry dataset (`full/` + `starter/`). **Read-only**; the only data source.
 - `skills/` — coding and data guidelines for humans and LLMs.
 - `skill_data.md` — notes about the dataset and its handling.

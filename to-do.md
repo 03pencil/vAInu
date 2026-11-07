@@ -40,13 +40,16 @@
   (301,393 rows, 5 assets; `tests/test_data_input.py` all pass).
 
 ## M2: Baseline analysis
-- [ ] Compute basic stats (mean, std, min, max) per asset/channel.
+- [x] Compute basic stats (mean, std, min, max) per asset/channel.
 - [ ] Plot time series per asset/channel.
-- [ ] Identify normal vs event windows.
-- [ ] Document baseline findings.
+- [x] Identify normal vs event windows (`src/labels.py`: benign /
+  fault_warming / fault_detectable / fault_undetectable / unknown).
+- [x] Document baseline findings (`scripts/sanity_gate.py`, see KPI box
+  under M4).
 
 ## M3: Feature engineering
-- [ ] Compute rolling mean/std per channel.
+- [x] Compute rolling mean/std per channel (`group_rolled`,
+  `rolling_robust_z` in `src/math.py`).
 - [ ] Compute vibration trend features.
 - [ ] Compute pressure/flow ratios.
 - [ ] Store feature dataset.
@@ -59,7 +62,12 @@
 - [ ] Record metrics (precision, recall, F1).
 
 ### Layer 1 math (deterministic, numpy only)
-- [ ] Robust healthy envelope: median/MAD per asset x channel x operating mode.
+- [x] Robust healthy envelope: median/MAD per asset x channel x operating
+  mode (`robust_stats`, `modified_zscores` in `src/math.py`), with
+  fleet-level fallback (`merged_stats`) for assets that are fully
+  fault-labeled and alone in their profile.
+- [x] Self-adaptive trailing z as second detection surface
+  (`rolling_robust_z`) for assets with no clean envelope at all.
 - [ ] Condition channel behavior on `operating_context.duty_demand_pct`.
 - [ ] Physics residuals from `assets.csv` curve parameters: hydraulic
   residual (H vs flow at speed ratio), efficiency proxy, strainer dP,
@@ -67,6 +75,16 @@
 - [ ] Trend extrapolation: trailing 6-24 h drift fit -> time-to-alarm /
   time-to-trip (long-scale prediction) with uncertainty band.
 - [ ] Fault-type likelihood vector from evidence-channel signatures.
+
+### Baseline KPI numbers (starter tier, 2026-11-07)
+Recorded so later layers can be compared against them:
+- [x] Sanity gate run: ALL 20 events detected (0 missed),
+  10/10 deadline-bearing events caught before deadline, median lead
+  1.6 h, best leads 119.7 h (PUMP-04 BEARING_WEAR), 100.2 h (IMBALANCE),
+  38.3 h (PUMP-08 SUCTION_STRAINER_CLOGGING), 31.8 h (PUMP-06 clogging).
+- [x] Benign false-alarm rate: 6.4% (envelope surface),
+  8.0% (rolling surface), thresholds z=3 smoothed over 60 samples.
+- [ ] Reduce FAR (debounce/state machine, richer features) — target < 2%.
 
 ### Layer 2 detector (learned, numpy only)
 - [ ] Mahalanobis anomaly score vs benign windows (numpy only).

@@ -112,6 +112,12 @@ smollm2:135m -> mistral -> gemma3:e2b).
 
 ## Phase 1 - data foundation (pure numpy)
 
+Status: DONE (2026-11-07). Delivered: real `load_telemetry` (UTC parse,
+quality-flag bitmask, asset joins), `labels.py` labeled windows,
+robust envelope math + fleet fallback in `math.py`, and the
+`scripts/sanity_gate.py` KPI gate. Baseline: 20/20 events detected,
+10/10 deadline events early (median lead 1.6 h), benign FAR 6.4 %.
+
 1. `data_input.load_telemetry()`: read telemetry.csv.gz with pandas, UTC
    timestamp parsing, sorted by asset/time, quality_flags as int mask.
 2. Asset/channel masks from `assets.channels_available`.
