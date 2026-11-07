@@ -416,7 +416,7 @@ is one hour of data per second). The run writes `pilot/state.json` and
 ### 7.6 Serve the dashboard on the LAN (board, second SSH session)
 
 ```bash
-.venv/bin/python scripts/web_ui.py --data data/starter --host 0.0.0.0 --port 8000
+.venv/bin/python scripts/web_ui.py --data data/full --host 10.20.3.13 --port 8000
 ```
 
 From a PC on the same network, open `http://<board>.local:8000`, or use the

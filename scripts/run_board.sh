@@ -4,16 +4,18 @@
 # Usage:
 #   scripts/run_board.sh setup        create .venv and install pinned requirements
 #   scripts/run_board.sh test         run every tests/test_*.py
-#   scripts/run_board.sh pilot        replay the starter tier into pilot/
+#   scripts/run_board.sh pilot        replay the data tier into pilot/
 #   scripts/run_board.sh stream       live-style replay: one frame per line, paced (like the UART link)
 #   scripts/run_board.sh narrate      narrate new alarms (LLM if [llm] enabled = true)
-#   scripts/run_board.sh dashboard    serve the web UI (foreground, Ctrl+C to stop)
+#   scripts/run_board.sh dashboard    serve the web UI (foreground, Ctrl+C to stop);
+#                                     also runs the LED matrix animation in the background
+#   scripts/run_board.sh led          run only the LED matrix animation (foreground)
 #   scripts/run_board.sh all          setup, test, pilot, narrate, then dashboard
 #   scripts/run_board.sh check        show Python, data, Ollama and [llm] status
 #
 # Options (before or after the command):
-#   --data DIR    tier directory            (default: data/starter)
-#   --host HOST   dashboard bind address    (default: 0.0.0.0)
+#   --data DIR    tier directory            (default: data/full)
+#   --host HOST   dashboard bind address    (default: 10.20.3.13)
 #   --port PORT   dashboard port            (default: 8000)
 #   --speed N     replay speed, 0 = fastest (default: 1 for stream, 0 for pilot)
 #   --skip-tests  with "all": skip the test step
@@ -26,7 +28,7 @@ PY_MIN_MAJOR=3
 PY_MIN_MINOR=11
 VENV_PY="$ROOT/.venv/bin/python"
 DATA="data/starter"
-HOST="0.0.0.0"
+HOST="10.20.3.13"
 PORT="8000"
 SPEED=""
 SKIP_TESTS="no"
@@ -42,7 +44,7 @@ usage() {
 parse_args() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      setup|test|pilot|stream|narrate|dashboard|all|check) COMMAND="$1" ;;
+      setup|test|pilot|stream|narrate|dashboard|led|all|check) COMMAND="$1" ;;
       --data) DATA="${2:?--data needs a value}"; shift ;;
       --host) HOST="${2:?--host needs a value}"; shift ;;
       --port) PORT="${2:?--port needs a value}"; shift ;;
@@ -82,9 +84,13 @@ check_project_files() {
   fi
 }
 
+has_telemetry() {
+  [[ -f "$DATA/telemetry.csv.gz" ]] || compgen -G "$DATA/telemetry/asset_id=*/day=*/part-*.parquet" >/dev/null
+}
+
 need_telemetry() {
-  if [[ "$DATA" == "data/starter" && ! -f "$DATA/telemetry.csv.gz" ]]; then
-    die "$DATA/telemetry.csv.gz is missing. Copy it from your PC (see arduino_uno_q_install.md, 7.2)."
+  if ! has_telemetry; then
+    die "no telemetry under $DATA. Copy the tier from your PC (see arduino_uno_q_install.md, 7.2)."
   fi
 }
 
@@ -163,11 +169,21 @@ cmd_narrate() {
   fi
 }
 
+cmd_led() {
+  need_venv
+  log "LED matrix animation (Ctrl+C to stop)"
+  "$VENV_PY" scripts/led_matrix.py
+}
+
 cmd_dashboard() {
   need_venv
   need_telemetry
+  log "LED matrix animation in the background (log: /tmp/vainu_led.log)"
+  "$VENV_PY" scripts/led_matrix.py > /tmp/vainu_led.log 2>&1 &
+  LED_PID=$!
+  trap 'kill "$LED_PID" 2>/dev/null || true' EXIT
   log "Dashboard on http://$HOST:$PORT  (no login: trusted network only)"
-  exec "$VENV_PY" scripts/web_ui.py --data "$DATA" --host "$HOST" --port "$PORT"
+  "$VENV_PY" scripts/web_ui.py --data "$DATA" --host "$HOST" --port "$PORT"
 }
 
 cmd_check() {
@@ -177,7 +193,7 @@ cmd_check() {
   echo "Python:    $(python3 --version)"
   echo "Repo:      $ROOT"
   if [[ -x "$VENV_PY" ]]; then echo "venv:      ready"; else echo "venv:      missing (run setup)"; fi
-  if [[ -f "$DATA/telemetry.csv.gz" ]]; then echo "telemetry: $DATA/telemetry.csv.gz"; else echo "telemetry: MISSING at $DATA"; fi
+  if has_telemetry; then echo "telemetry: $DATA"; else echo "telemetry: MISSING at $DATA"; fi
   if command -v ollama >/dev/null 2>&1; then
     if systemctl is-active --quiet ollama 2>/dev/null; then echo "ollama:    running"; else echo "ollama:    installed, not running"; fi
   else
@@ -206,6 +222,7 @@ case "$COMMAND" in
   stream) cmd_stream ;;
   narrate) cmd_narrate ;;
   dashboard) cmd_dashboard ;;
+  led) cmd_led ;;
   all) cmd_all ;;
   check) cmd_check ;;
 esac

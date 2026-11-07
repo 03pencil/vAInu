@@ -73,7 +73,7 @@ confirm_samples = 18
 escalate_samples = 180
 
 [web_ui]
-# Local dashboard defaults. Use --host 0.0.0.0 to expose it on the LAN.
+# Local dashboard defaults. Use --host 10.20.3.13 to expose it on the board's LAN address.
 host = "127.0.0.1"
 port = 8000
 # Browser polling interval (seconds) and samples returned per chart window.
