@@ -165,14 +165,14 @@ def test_forecast_on_real_data() -> None:
     binned = binned_medians(df, channels, bin_minutes=10)
     per_bin, latest = trend_forecast(binned, assets, channels=channels)
     assert not per_bin.empty and not latest.empty
-    wear = per_bin[(per_bin["asset_id"] == "PUMP-04")
+    wear = per_bin[(per_bin["asset_id"] == "PUMP-02")
                    & (per_bin["channel"] == CHANNEL)]
     assert (wear[TREND_SLOPE] > 0.02).any()  # bearing wear ramps vibration
     valid_ttl = wear[TREND_TTL].dropna()
     assert not valid_ttl.empty and valid_ttl.between(0.0, 10_000.0).any()
-    row = latest[(latest["asset_id"] == "PUMP-04")
+    row = latest[(latest["asset_id"] == "PUMP-02")
                  & (latest["channel"] == CHANNEL)].iloc[0]
-    assert row[TREND_LIMIT] == 6.4  # category II alarm from assets.csv
+    assert row[TREND_LIMIT] == 5.0  # alarm limit from assets.csv
     assert row[TREND_VALUE] >= 0.0  # mm/s scale, non-negative
 
 

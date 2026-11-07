@@ -11,6 +11,7 @@ import pandas as pd
 
 from src.data_input import channel_columns, load_telemetry
 from src.labels import (
+    FAULT_LABELS,
     LABEL_BENIGN,
     LABEL_FAULT_DETECTABLE,
     LABEL_FAULT_WARMING,
@@ -37,10 +38,22 @@ def test_events_and_benign_tables_load() -> None:
 
 def test_label_telemetry_covers_windows() -> None:
     df = load_telemetry()
-    labeled = label_telemetry(df)
+    events = load_events()
+    benign = load_benign_windows()
+    labeled = label_telemetry(df, events, benign)
     counts = labeled["label"].value_counts()
-    # Some confirmed-good windows and data outside every window both exist.
-    assert LABEL_BENIGN in counts.index
+    # A fault-heavy cut (e.g. only day 7) can place every confirmed-good
+    # window inside an active fault; fault labels win by design. Require a
+    # benign label only where a benign row survives outside every fault.
+    benign_only = label_telemetry(df, events.iloc[0:0], benign)
+    in_fault = label_telemetry(df, events, benign.iloc[0:0])
+    survives = (
+        (benign_only["label"] == LABEL_BENIGN)
+        & ~in_fault["label"].isin(FAULT_LABELS)
+    )
+    if survives.any():
+        assert LABEL_BENIGN in counts.index
+    # Data outside every labeled window always exists.
     assert LABEL_UNKNOWN in counts.index
     assert labeled["label"].isin(
         [LABEL_BENIGN, LABEL_FAULT_WARMING, LABEL_FAULT_DETECTABLE, LABEL_UNKNOWN,
