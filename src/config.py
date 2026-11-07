@@ -31,6 +31,18 @@ def get_rolling_window(cfg: dict | None = None) -> int:
     return cfg.get("analysis", {}).get("rolling_window", 5)
 
 
+def get_z_threshold(cfg: dict | None = None) -> float:
+    if cfg is None:
+        cfg = load_config()
+    return cfg.get("analysis", {}).get("z_threshold", 3.0)
+
+
+def get_smoothing_window(cfg: dict | None = None) -> int:
+    if cfg is None:
+        cfg = load_config()
+    return cfg.get("analysis", {}).get("smoothing_window", 60)
+
+
 def get_asset_ids(cfg: dict | None = None) -> list[str]:
     if cfg is None:
         cfg = load_config()

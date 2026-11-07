@@ -4,7 +4,7 @@
 > anything inside it. See `skills/python-style.md` and `skill_data.md`.
 
 ## M1: Data exploration
-- [ ] Develop .py files (data_input, math, ui, main) into working implementations.
+- [x] Develop .py files (data_input, math, ui, main) into working implementations.
 - [x] Set up Python environment / install pandas, matplotlib.
 - [x] Load telemetry from the configured tier (full/starter) into a DataFrame.
 - [x] Inspect channel names and data types.

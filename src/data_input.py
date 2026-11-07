@@ -9,6 +9,8 @@ reads from it.
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
@@ -42,10 +44,8 @@ _ID_COLUMNS = (
 _TELEMETRY_FILENAMES = ("telemetry.csv.gz", "telemetry.csv")
 
 
-def _resolve_telemetry_file(path: str | None) -> "Path-like":  # noqa: F821
+def _resolve_telemetry_file(path: str | None = None) -> Path:
     """Locate the telemetry file for a tier directory or explicit path."""
-    from pathlib import Path
-
     target = Path(path) if path is not None else Path(get_data_dir())
     if not target.exists():
         raise FileNotFoundError(f"Telemetry path not found: {target}")
@@ -62,13 +62,21 @@ def _resolve_telemetry_file(path: str | None) -> "Path-like":  # noqa: F821
     )
 
 
-def load_telemetry(path: str | None = None) -> pd.DataFrame:
+# Asset metadata columns joined onto telemetry when join_assets=True.
+_ASSET_JOIN_COLUMNS = ("profile", "control", "instrumentation_tier")
+
+
+def load_telemetry(path: str | None = None, join_assets: bool = False) -> pd.DataFrame:
     """Load telemetry as one DataFrame, sorted by asset then timestamp.
 
     `path` may be a tier directory (containing telemetry.csv.gz/.csv) or
     an explicit file. Nullable channels stay NaN (never filled), and rows
     are never dropped here: quality_flags carries the reason for any
     missing/odd values so downstream code can decide.
+
+    With `join_assets=True`, nameplate columns from assets.csv (profile,
+    control, instrumentation_tier) are merged onto every row, keyed by
+    asset_id — used e.g. for fate/fleet-level fallback statistics.
     """
     file = _resolve_telemetry_file(path)
     df = pd.read_csv(file)
@@ -76,6 +84,10 @@ def load_telemetry(path: str | None = None) -> pd.DataFrame:
     df["quality_flags"] = (
         pd.to_numeric(df["quality_flags"], errors="coerce").fillna(0).astype("int16")
     )
+    if join_assets:
+        assets = load_assets(str(Path(file).parent / "assets.csv"))
+        join_cols = [c for c in _ASSET_JOIN_COLUMNS if c in assets.columns]
+        df = df.merge(assets[["asset_id"] + join_cols], on="asset_id", how="left")
     return df.sort_values(["asset_id", "timestamp_utc"]).reset_index(drop=True)
 
 
@@ -111,8 +123,6 @@ def split_assets(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
 
 def load_assets(path: str | None = None) -> pd.DataFrame:
     """Load the asset metadata table (nameplates, limits, splits)."""
-    from pathlib import Path
-
     if path is None:
         path = Path(get_data_dir()) / "assets.csv"
     return pd.read_csv(path)

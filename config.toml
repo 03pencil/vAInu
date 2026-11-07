@@ -31,3 +31,8 @@ names = [
 [analysis]
 # Window size for rolling statistics.
 rolling_window = 5
+# Modified z-score threshold for raising a per-channel alarm.
+z_threshold = 3.0
+# Smoothing window in samples for alarm decisions (10 s grid -> 60 = 10 min,
+# matching how the benchmark defines detectability).
+smoothing_window = 60
