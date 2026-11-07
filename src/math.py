@@ -79,7 +79,8 @@ def merged_stats(
     asset_profiles = (
         df[["asset_id", "profile"]].drop_duplicates().set_index("asset_id")["profile"]
     )
-    added = []
+    added_median: list[pd.DataFrame] = []
+    added_mad: list[pd.DataFrame] = []
     for (profile, mode), fb_med in fallback["median"].iterrows():
         fb_mad = fallback["mad"].loc[(profile, mode)]
         for asset_id, asset_profile in asset_profiles.items():
@@ -95,15 +96,15 @@ def merged_stats(
             else:
                 # Asset has no rows of its own here (e.g. fully fault-labeled
                 # window): synthesize the envelope row from the profile.
-                added.append(pd.DataFrame({"median": [fb_med], "mad": [fb_mad]},
-                                          index=pd.MultiIndex.from_tuples(
-                                              [(key[0], key[1])],
-                                              names=["asset_id", "operating_mode"])))
-    if added:
-        med_extra = pd.concat([a["median"] for a in added])
-        mad_extra = pd.concat([a["mad"] for a in added])
-        stats["median"] = pd.concat([stats["median"], med_extra]).sort_index()
-        stats["mad"] = pd.concat([stats["mad"], mad_extra]).sort_index()
+                index = pd.MultiIndex.from_tuples(
+                    [(key[0], key[1])], names=["asset_id", "operating_mode"])
+                added_median.append(pd.DataFrame(
+                    [fb_med.to_numpy()], columns=fb_med.index, index=index))
+                added_mad.append(pd.DataFrame(
+                    [fb_mad.to_numpy()], columns=fb_med.index, index=index))
+    if added_median:
+        stats["median"] = pd.concat([stats["median"], *added_median]).sort_index()
+        stats["mad"] = pd.concat([stats["mad"], *added_mad]).sort_index()
     return stats
 
 
