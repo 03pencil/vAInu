@@ -69,9 +69,6 @@ motor_winding_temp_c = 140.0
 # the 10 s grid), and ESCALATED after escalate_samples (30 min). This
 # is the FAR-reduction surface (to-do M4: target < 2 %).
 confirm_samples = 18
-<<<<<<< Updated upstream
-escalate_samples = 180
-=======
 escalate_samples = 180
 
 [web_ui]
@@ -80,7 +77,10 @@ host = "127.0.0.1"
 port = 8000
 # Browser polling interval (seconds) and samples returned per chart window.
 refresh_seconds = 2
-history_samples = 240
+history_samples = 600
+# Chart-window choices in seconds; the UI converts them to samples using the
+# telemetry grid (1 s on the full tier, 10 s on the starter tier).
+window_intervals = [10, 60, 600, 1800, 3600]
 # |z| >= z_threshold * watch_fraction is shown as WATCH (below ALARM).
 watch_fraction = 0.5
 # Severity gauge shown in the UI: 0 = no deviation, alarm_mark = the z
@@ -92,4 +92,3 @@ default_channel = "vibration_rms_mm_s"
 # Finished alarm surface kept on disk so a restart skips the rebuild.
 # Relative paths resolve from the repository root; "" disables the cache.
 cache_dir = "cache/web_ui"
->>>>>>> Stashed changes

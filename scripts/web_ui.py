@@ -98,6 +98,7 @@ def main() -> None:
         port=port,
         refresh_seconds=web_config["refresh_seconds"],
         history_samples=web_config["history_samples"],
+        window_intervals=web_config["window_intervals"],
         verbose=args.verbose,
         pilot_state_path=Path(args.pilot_state),
     )

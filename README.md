@@ -47,8 +47,6 @@ See [`plan.md`](plan.md) for the full architecture and roadmap, and [`to-do.md`]
 - `skill_data.md` — notes about the dataset and its handling.
 - `plan.md` / `to-do.md` / [`bom.md`](bom.md) — roadmap, task breakdown, and minimal hardware BOM.
 
-<<<<<<< Updated upstream
-=======
 ## Web UI (first version)
 
 A dependency-free local dashboard shows the current alarm surface over the
@@ -88,7 +86,6 @@ python scripts/web_ui.py --data data/full --cache-dir "" # disable the cache
 > bundle. The dashboard uses the same robust
 > envelope math as `scripts/sanity_gate.py`; SmolLM narration is not wired yet.
 
->>>>>>> Stashed changes
 ## Tech Stack
 
 - Python / MicroPython, PEP 8, simple but effective.

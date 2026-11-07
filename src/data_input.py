@@ -42,6 +42,7 @@ _ID_COLUMNS = (
 )
 
 _TELEMETRY_FILENAMES = ("telemetry.csv.gz", "telemetry.csv")
+_PARQUET_GLOB = "telemetry/asset_id=*/day=*/part-*.parquet"
 
 
 def _resolve_telemetry_file(path: str | None = None) -> Path:
@@ -55,11 +56,37 @@ def _resolve_telemetry_file(path: str | None = None) -> Path:
         candidate = target / name
         if candidate.is_file():
             return candidate
+    if _parquet_parts(target):
+        return target
     raise FileNotFoundError(
-        f"No telemetry.csv.gz or telemetry.csv under {target}. "
-        "Check [paths] data_dir in config.toml (data/full currently ships "
-        "without telemetry: its manifest lists parquets that are absent)."
+        f"No telemetry.csv.gz, telemetry.csv or telemetry/ parquet partitions "
+        f"under {target}. Check [paths] data_dir in config.toml."
     )
+
+
+def _parquet_parts(tier_dir: Path) -> list[Path]:
+    """Partitioned parquet telemetry files (full tier), sorted by asset and day."""
+    return sorted(tier_dir.glob(_PARQUET_GLOB))
+
+
+def _read_parquet_partitions(tier_dir: Path) -> pd.DataFrame:
+    """Concatenate per-asset/per-day parquet partitions into one wide frame.
+
+    The asset id lives in the ``asset_id=`` folder name, not in the files, so
+    it is added here. Numeric columns are widened to float64 so the full tier
+    matches the CSV starter tier's dtypes and downstream math.
+    """
+    frames = []
+    for part in _parquet_parts(tier_dir):
+        asset_id = part.parents[1].name.removeprefix("asset_id=")
+        frame = pd.read_parquet(part)
+        frame.insert(0, "asset_id", asset_id)
+        frames.append(frame)
+    df = pd.concat(frames, ignore_index=True)
+    float_cols = df.select_dtypes(include="float32").columns
+    df[float_cols] = df[float_cols].astype("float64")
+    df["operating_mode"] = df["operating_mode"].astype(str)
+    return df
 
 
 # Asset metadata columns joined onto telemetry when join_assets=True.
@@ -79,13 +106,18 @@ def load_telemetry(path: str | None = None, join_assets: bool = False) -> pd.Dat
     asset_id — used e.g. for fate/fleet-level fallback statistics.
     """
     file = _resolve_telemetry_file(path)
-    df = pd.read_csv(file)
+    if file.is_dir():
+        tier_dir = file
+        df = _read_parquet_partitions(tier_dir)
+    else:
+        tier_dir = file.parent
+        df = pd.read_csv(file)
     df["timestamp_utc"] = pd.to_datetime(df["timestamp_utc"], utc=True)
     df["quality_flags"] = (
         pd.to_numeric(df["quality_flags"], errors="coerce").fillna(0).astype("int16")
     )
     if join_assets:
-        assets = load_assets(str(Path(file).parent / "assets.csv"))
+        assets = load_assets(str(tier_dir / "assets.csv"))
         join_cols = [c for c in _ASSET_JOIN_COLUMNS if c in assets.columns]
         df = df.merge(assets[["asset_id"] + join_cols], on="asset_id", how="left")
     return df.sort_values(["asset_id", "timestamp_utc"]).reset_index(drop=True)
@@ -126,6 +158,27 @@ def load_assets(path: str | None = None) -> pd.DataFrame:
     if path is None:
         path = Path(get_data_dir()) / "assets.csv"
     return pd.read_csv(path)
+
+
+def load_channel_units(path: str | None = None) -> dict[str, str]:
+    """Map telemetry channel names to their units from data_dictionary.csv.
+
+    Units are presentation metadata (e.g. "kPa(g)", "mm/s"); an empty dict
+    is returned when the dictionary is absent so callers can fall back to
+    a neutral "-" label.
+    """
+    if path is None:
+        path = Path(get_data_dir()) / "data_dictionary.csv"
+    dictionary = Path(path)
+    if not dictionary.is_file():
+        return {}
+    rows = pd.read_csv(dictionary)
+    telemetry = rows.loc[rows["table"] == "telemetry"]
+    units: dict[str, str] = {}
+    for row in telemetry.itertuples(index=False):
+        unit = getattr(row, "unit", "-")
+        units[str(row.column)] = "-" if pd.isna(unit) else str(unit)
+    return units
 
 
 def asset_channels(asset_id: str, assets: "pd.DataFrame | None" = None) -> list[str]:

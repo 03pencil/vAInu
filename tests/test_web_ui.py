@@ -26,6 +26,7 @@ from src.web_ui import (
     severity_score,
     status_for,
     top_deviations,
+    window_options,
 )
 from src.math import rolling_robust_z
 
@@ -97,6 +98,18 @@ def test_severity_score_is_a_bounded_gauge() -> None:
     assert severity_score(9.0, 3.0) == 100.0
     assert severity_score(30.0, 3.0) == 100.0
     assert 80.0 < severity_score(3.86, 3.0) < 100.0
+
+
+def test_window_options_cover_requested_intervals() -> None:
+    options = window_options([10, 60, 600, 1800, 3600], 1.0)
+    assert [option["label"] for option in options] == [
+        "10 s", "1 min", "10 min", "30 min", "60 min",
+    ]
+    assert [option["samples"] for option in options] == [10, 60, 600, 1800, 3600]
+    # A 10 s grid cannot show a 1 s window, and the counts scale with the grid.
+    coarse = window_options([10, 60, 600], 10.0)
+    assert [option["label"] for option in coarse] == ["10 s", "1 min", "10 min"]
+    assert [option["samples"] for option in coarse] == [2, 6, 60]
 
 
 def test_top_deviations_sorts_by_absolute_z() -> None:
@@ -185,6 +198,7 @@ if __name__ == "__main__":
         test_json_safe_handles_missing_and_numpy,
         test_status_for_covers_all_states,
         test_severity_score_is_a_bounded_gauge,
+        test_window_options_cover_requested_intervals,
         test_top_deviations_sorts_by_absolute_z,
         test_asset_payload_falls_back_to_channel_with_data,
         test_asset_payload_keeps_explicit_empty_channel,

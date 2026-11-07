@@ -27,7 +27,11 @@ from urllib.parse import parse_qs, unquote, urlparse
 import numpy as np
 import pandas as pd
 
-from .config import get_smoothing_window, get_z_threshold
+from .config import (
+    DEFAULT_WINDOW_INTERVALS,
+    get_smoothing_window,
+    get_z_threshold,
+)
 from .data_input import channel_columns, load_channel_units, load_telemetry
 from .labels import (
     FAULT_LABELS,
@@ -166,6 +170,46 @@ def severity_score(
     headroom = max(SEVERE_MULTIPLE - 1.0, 1e-9)
     excess = (magnitude - threshold) / (headroom * threshold)
     return min(100.0, alarm_mark + (100.0 - alarm_mark) * excess)
+
+
+def _duration_label(seconds: int) -> str:
+    """Human label for a chart window (45 s, 10 min)."""
+    if seconds < 60:
+        return f"{seconds} s"
+    return f"{seconds // 60} min"
+
+
+def window_options(
+    intervals: "list[int]",
+    sample_seconds: float,
+) -> list[dict[str, Any]]:
+    """Chart-window choices: wall-clock label plus sample count for this grid."""
+    sample = float(sample_seconds) if sample_seconds else 1.0
+    options: list[dict[str, Any]] = []
+    for seconds in intervals:
+        seconds = int(seconds)
+        if seconds < sample:
+            continue
+        options.append({
+            "seconds": seconds,
+            "samples": max(2, int(round(seconds / sample))),
+            "label": _duration_label(seconds),
+        })
+    return options
+
+
+def _sample_seconds(frame: pd.DataFrame) -> float:
+    """Median sample spacing of the tier (1.0 on the 1 Hz full tier)."""
+    if frame.empty or "timestamp_utc" not in frame.columns:
+        return 1.0
+    try:
+        deltas = frame["timestamp_utc"].iloc[:200].diff().dt.total_seconds().dropna()
+    except (TypeError, AttributeError):
+        return 1.0
+    if deltas.empty:
+        return 1.0
+    spacing = float(deltas.median())
+    return spacing if spacing > 0 else 1.0
 
 
 def _cache_inputs(tier_dir: Path, path: Path) -> list[Path]:
@@ -345,6 +389,7 @@ class DashboardData:
     watch_fraction: float
     default_channel: str
     alarm_mark: float = ALARM_MARK
+    sample_seconds: float = 1.0
     warning: str | None = None
     cache_hit: bool = False
     build_seconds: float = 0.0
@@ -367,6 +412,7 @@ class DashboardData:
         channels = channel_columns(frame)
         if not channels:
             raise ValueError("No telemetry channels found in the selected data tier.")
+        sample_seconds = _sample_seconds(frame)
 
         smoothing = get_smoothing_window()
         z_threshold = get_z_threshold()
@@ -430,6 +476,7 @@ class DashboardData:
             watch_fraction=kwargs.get("watch_fraction", 0.5),
             default_channel=kwargs.get("default_channel", "vibration_rms_mm_s"),
             alarm_mark=kwargs.get("alarm_mark", ALARM_MARK),
+            sample_seconds=sample_seconds,
             warning=warning,
             cache_hit=cache_hit,
             build_seconds=time.perf_counter() - started,
@@ -598,6 +645,11 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 self._send_json({
                     "refresh_seconds": self.web_config["refresh_seconds"],
                     "history_samples": self.web_config["history_samples"],
+                    "sample_seconds": self.data.sample_seconds,
+                    "windows": window_options(
+                        self.web_config["window_intervals"],
+                        self.data.sample_seconds,
+                    ),
                     "z_threshold": self.data.z_threshold,
                     "watch_fraction": self.data.watch_fraction,
                     "alarm_mark": self.data.alarm_mark,
@@ -687,7 +739,8 @@ def serve(
     host: str = "127.0.0.1",
     port: int = 8000,
     refresh_seconds: float = 2.0,
-    history_samples: int = 240,
+    history_samples: int = 600,
+    window_intervals: "list[int] | None" = None,
     verbose: bool = False,
     pilot_state_path: "Path | None" = None,
 ) -> None:
@@ -700,6 +753,8 @@ def serve(
             "web_config": {
                 "refresh_seconds": refresh_seconds,
                 "history_samples": history_samples,
+                "window_intervals": list(
+                    window_intervals or DEFAULT_WINDOW_INTERVALS),
             },
             "pilot_state_path": pilot_state_path,
             "verbose": verbose,
@@ -928,12 +983,7 @@ h2 { margin: 0; font-size: 15px; font-weight: 600; }
         <h2>Signal</h2>
         <div class="controls">
           <select id="channel-select" class="select"></select>
-          <select id="window-select" class="select">
-            <option value="60">10 min</option>
-            <option value="240" selected>40 min</option>
-            <option value="720">2 h</option>
-            <option value="2160">6 h</option>
-          </select>
+          <select id="window-select" class="select"></select>
         </div>
       </div>
       <div id="chart" class="chart"></div>
@@ -1057,10 +1107,22 @@ function zClass(score, threshold) {
 
 async function loadConfig() {
   state.config = await api("/api/config");
+  const select = $("window-select");
+  select.innerHTML = "";
+  for (const entry of state.config.windows || []) {
+    const option = document.createElement("option");
+    option.value = String(entry.samples);
+    option.textContent = entry.label;
+    select.appendChild(option);
+  }
+  const samples = [...select.options].map((option) => Number(option.value));
+  state.window = Number(state.config.history_samples) || state.window;
+  if (!samples.includes(state.window)) {
+    state.window = samples[samples.length - 1] || state.window;
+  }
+  select.value = String(state.window);
   $("threshold-label").textContent = Number(state.config.z_threshold).toFixed(1) + "s";
   $("alarm-mark-label").textContent = Number(state.config.alarm_mark).toFixed(0);
-  state.window = state.config.history_samples || state.window;
-  $("window-select").value = String(state.window);
 }
 
 async function loadPilot() {
