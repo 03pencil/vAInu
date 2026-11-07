@@ -1,0 +1,8 @@
+record_id,asset_id,work_type,start_utc,end_utc,operator_observation,diagnosis_confidence,planned,in_window
+PUMP-01-M0060,PUMP-01,SENSOR_REPLACEMENT,2025-08-17T20:20:51Z,2025-08-17T20:35:51Z,Bearing temperature sensor constant for hours; cable / transmitter fault repaired.,CONFIRMED,False,True
+PUMP-03-M0060,PUMP-03,SENSOR_RECALIBRATION,2026-03-08T06:00:00Z,2026-03-08T06:15:00Z,"Discharge pressure transmitter: calibration error after maintenance, corrected.",CONFIRMED,False,True
+PUMP-04-M0063,PUMP-04,VALVE_OR_COOLER_SERVICE,2025-06-22T07:06:02Z,2025-06-22T11:45:14Z,"Heat exchanger fouled, cleaned.",CONFIRMED,False,True
+PUMP-07-M0059,PUMP-07,COUPLING_INSPECTION,2025-05-18T00:49:10Z,2025-05-18T03:46:23Z,"Coupling guard removed and coupling checked, OK.",CONFIRMED,True,True
+PUMP-08-M0062,PUMP-08,COUPLING_INSPECTION,2025-09-14T01:57:08Z,2025-09-14T03:44:18Z,"Coupling guard removed and coupling checked, OK.",CONFIRMED,True,True
+PUMP-08-M0066,PUMP-08,WIRING_REPAIR,2025-09-14T06:39:47Z,2025-09-14T06:54:47Z,Spikes on Discharge pressure transmitter; cable screen re-terminated.,PROBABLE,False,True
+PUMP-08-M0064,PUMP-08,COUPLING_INSPECTION,2025-09-14T12:26:59Z,2025-09-14T16:22:20Z,"Coupling guard removed and coupling checked, OK.",CONFIRMED,True,True
