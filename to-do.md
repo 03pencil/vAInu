@@ -1,6 +1,5 @@
 # To-Do
 
-> `data/` is read-only. Never edit, overwrite, or delete anything inside it.
 
 ## Next up
 
