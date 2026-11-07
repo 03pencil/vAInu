@@ -19,8 +19,8 @@ pruna_api_key.txt
 Thumbs.db
 
 # Folders
-# Derived 3-pump tier (built from the participant bundle, never committed)
-data_3pumps/
+# Derived day-7 tier (all pumps, built from the participant bundle)
+data_day7/
 
 
 # Pilot output (state.json, predictions.jsonl)

@@ -978,6 +978,8 @@ h2 { margin: 0; font-size: 15px; font-weight: 600; }
 .chart { width: 100%; min-height: 260px; }
 .chart svg { width: 100%; height: auto; display: block; }
 .grid { stroke: #22304a; stroke-width: 1; }
+.grid-x { stroke: #1b273b; stroke-width: 1; }
+.tick { stroke: #2a3a56; stroke-width: 1; }
 .axis { fill: var(--muted); font-size: 10px; }
 .line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
 .last-dot { fill: var(--accent); }
@@ -1126,6 +1128,7 @@ h2 { margin: 0; font-size: 15px; font-weight: 600; }
 </div>
 <script>
 const SERIES_COLORS = ["#5ea0ff", "#f5b84b", "#35d07f"];
+const AXIS_STEPS = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200];
 
 const state = {
   config: null,
@@ -1190,6 +1193,19 @@ function formatTime(timestamp) {
   return date.toLocaleString([], {
     month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit",
   });
+}
+
+function pad2(value) {
+  return String(value).padStart(2, "0");
+}
+
+function clockTime(date, showSeconds) {
+  const time = pad2(date.getHours()) + ":" + pad2(date.getMinutes());
+  return showSeconds ? time + ":" + pad2(date.getSeconds()) : time;
+}
+
+function dayLabel(date) {
+  return date.toLocaleDateString([], {month: "short", day: "2-digit"});
 }
 
 function formatZ(score) {
@@ -1520,13 +1536,16 @@ function renderChart(data) {
     container.innerHTML = '<div class="empty">No data for the selected channels in this window.</div>';
     return;
   }
-  const length = Math.max(...prepared.map((entry) => entry.values.length));
   const width = 800;
   const height = 260;
-  const pad = {left: 56, right: 12, top: 14, bottom: 30};
+  const pad = {left: 56, right: 12, top: 14, bottom: 38};
   const plotW = width - pad.left - pad.right;
   const plotH = height - pad.top - pad.bottom;
-  const x = (index) => pad.left + (length <= 1 ? 0 : (index / (length - 1)) * plotW);
+  const times = data.timestamps.map((value) => new Date(value).getTime());
+  const firstMs = times[0];
+  const lastMs = times[times.length - 1];
+  const spanMs = Math.max(1, lastMs - firstMs);
+  const x = (index) => pad.left + ((times[index] - firstMs) / spanMs) * plotW;
   const y = (entry, value) => pad.top + plotH -
     ((value - entry.min) / (entry.max - entry.min)) * plotH;
 
@@ -1540,6 +1559,50 @@ function renderChart(data) {
       const label = only.max - ((only.max - only.min) * i) / 4;
       svg += '<text x="' + (pad.left - 8) + '" y="' + (gy + 4) + '" class="axis" text-anchor="end">' + label.toFixed(2) + "</text>";
     }
+  }
+  const durationSeconds = (lastMs - firstMs) / 1000;
+  let stepSeconds = AXIS_STEPS[AXIS_STEPS.length - 1];
+  let bestDistance = Infinity;
+  for (const candidate of AXIS_STEPS) {
+    const distance = Math.abs(durationSeconds / candidate - 4);
+    if (distance <= bestDistance) {
+      bestDistance = distance;
+      stepSeconds = candidate;
+    }
+  }
+  const stepMs = stepSeconds * 1000;
+  const showSeconds = stepSeconds < 60;
+  const tickTimes = [];
+  const addTick = (ms) => {
+    if (ms < firstMs - 1 || ms > lastMs + 1) return;
+    if (tickTimes.some((existing) => Math.abs(existing - ms) < stepMs * 0.35)) {
+      return;
+    }
+    tickTimes.push(ms);
+  };
+  addTick(firstMs);
+  const firstAligned = Math.ceil(firstMs / stepMs) * stepMs;
+  for (let ms = firstAligned; ms <= lastMs; ms += stepMs) addTick(ms);
+  addTick(lastMs);
+  tickTimes.sort((left, right) => left - right);
+
+  let previousDay = null;
+  for (let i = 0; i < tickTimes.length; i++) {
+    const tickX = pad.left + ((tickTimes[i] - firstMs) / spanMs) * plotW;
+    const tickDate = new Date(tickTimes[i]);
+    svg += '<line x1="' + tickX + '" y1="' + pad.top + '" x2="' + tickX +
+      '" y2="' + (pad.top + plotH) + '" class="grid-x"/>';
+    svg += '<line x1="' + tickX + '" y1="' + (pad.top + plotH) + '" x2="' + tickX +
+      '" y2="' + (pad.top + plotH + 4) + '" class="tick"/>';
+    const day = tickDate.toDateString();
+    const withDate = i === 0 || day !== previousDay;
+    const label = (withDate ? dayLabel(tickDate) + " " : "") +
+      clockTime(tickDate, showSeconds);
+    const anchor = i === 0 ? "start" :
+      (i === tickTimes.length - 1 ? "end" : "middle");
+    svg += '<text x="' + tickX + '" y="' + (height - 8) +
+      '" class="axis" text-anchor="' + anchor + '">' + label + "</text>";
+    previousDay = day;
   }
   let runStart = null;
   for (let i = 0; i <= data.alarm.length; i++) {
@@ -1570,9 +1633,6 @@ function renderChart(data) {
         '" r="3.5" class="last-dot" style="fill:' + entry.color + '"/>';
     }
   }
-  svg += '<text x="' + pad.left + '" y="' + (height - 8) + '" class="axis">' + formatTime(data.timestamps[0]) + "</text>";
-  svg += '<text x="' + (width - pad.right) + '" y="' + (height - 8) + '" class="axis" text-anchor="end">' +
-    formatTime(data.timestamps[data.timestamps.length - 1]) + "</text>";
   svg += "</svg>";
 
   const legend = prepared.map((entry) => {
