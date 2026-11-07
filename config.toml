@@ -37,6 +37,7 @@ z_threshold = 3.0
 # matching how the benchmark defines detectability).
 smoothing_window = 60
 
+<<<<<<< Updated upstream
 [trend]
 # Layer 1 item 3: trailing-drift extrapolation -> time-to-limit.
 # Forecasts run on short-interval RUNNING-row medians (bin_minutes),
@@ -64,4 +65,3 @@ motor_winding_temp_c = 140.0
 # the 10 s grid), and ESCALATED after escalate_samples (30 min). This
 # is the FAR-reduction surface (to-do M4: target < 2 %).
 confirm_samples = 18
-escalate_samples = 180

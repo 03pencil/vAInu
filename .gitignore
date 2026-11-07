@@ -4,6 +4,7 @@ __pycache__/
 .venv/
 venv/
 .env
+pruna_api_key.txt
 
 # Data outputs
 *.parquet

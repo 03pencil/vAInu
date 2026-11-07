@@ -6,6 +6,15 @@ import tomllib
 
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config.toml")
 
+_WEB_UI_DEFAULTS = {
+    "host": "127.0.0.1",
+    "port": 8000,
+    "refresh_seconds": 2,
+    "history_samples": 240,
+    "watch_fraction": 0.5,
+    "default_channel": "vibration_rms_mm_s",
+}
+
 
 def load_config(path: str = CONFIG_FILE) -> dict:
     """Load and return the project configuration as a dict."""
@@ -85,3 +94,12 @@ def get_tiers(cfg: dict | None = None) -> list[str]:
     if cfg is None:
         cfg = load_config()
     return cfg.get("paths", {}).get("tiers", ["full", "starter"])
+
+
+def get_web_ui_config(cfg: dict | None = None) -> dict:
+    """Web UI settings from [web_ui], with defaults for missing keys."""
+    if cfg is None:
+        cfg = load_config()
+    values = dict(_WEB_UI_DEFAULTS)
+    values.update(cfg.get("web_ui", {}))
+    return values

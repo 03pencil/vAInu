@@ -128,6 +128,27 @@ def load_assets(path: str | None = None) -> pd.DataFrame:
     return pd.read_csv(path)
 
 
+def load_channel_units(path: str | None = None) -> dict[str, str]:
+    """Map telemetry channel names to their units from data_dictionary.csv.
+
+    Units are presentation metadata (e.g. "kPa(g)", "mm/s"); an empty dict
+    is returned when the dictionary is absent so callers can fall back to
+    a neutral "-" label.
+    """
+    if path is None:
+        path = Path(get_data_dir()) / "data_dictionary.csv"
+    dictionary = Path(path)
+    if not dictionary.is_file():
+        return {}
+    rows = pd.read_csv(dictionary)
+    telemetry = rows.loc[rows["table"] == "telemetry"]
+    units: dict[str, str] = {}
+    for row in telemetry.itertuples(index=False):
+        unit = getattr(row, "unit", "-")
+        units[str(row.column)] = "-" if pd.isna(unit) else str(unit)
+    return units
+
+
 def asset_channels(asset_id: str, assets: "pd.DataFrame | None" = None) -> list[str]:
     """Channels instrumented on `asset_id` (from assets.channels_available)."""
     if assets is None:

@@ -138,6 +138,8 @@ Recorded so later layers can be compared against them:
   math/ML and runs as plain Python on the UNO Q MPU.
 
 ## M6: Deploy on UNO Q
+- [x] First local web UI prototype (`scripts/web_ui.py`): asset status,
+  latest values, top deviations, channel chart, replay; stdlib server only.
 - [ ] Create App Lab app skeleton.
 - [ ] Implement MCU receiver for sensor data from logic box.
 - [ ] Wire MPU to run inference on received data.

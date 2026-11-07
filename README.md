@@ -37,15 +37,42 @@ See [`plan.md`](plan.md) for the full architecture and roadmap, and [`to-do.md`]
   - `data_input.py` — load and split telemetry (+ asset nameplate joins, quality-flag helpers).
   - `labels.py` — aligns event / benign-window labels onto telemetry rows.
   - `math.py` — robust statistics, modified z-scores, group-aware rolling helpers.
+  - `physics.py` — pump-curve, flow, efficiency and thermal residual features.
+  - `web_ui.py` — first-version local dashboard (stdlib HTTP server + JSON API).
   - `ui.py` — matplotlib plotting helpers.
   - `config.py` — reads `config.toml`.
 - `scripts/` — runnable pipelines:
   - `sanity_gate.py` — baseline KPI gate: benign false-alarm rate + early-warning lead time vs the benchmark's own detection clock.
+  - `web_ui.py` — serves the local dashboard (asset status, latest values, channel chart, replay).
 - `tests/` — plain-assert test scripts (run with `.venv/bin/python tests/test_*.py`).
 - `data/` — pump telemetry dataset (`full/` + `starter/`). **Read-only**; the only data source.
 - `skills/` — coding and data guidelines for humans and LLMs.
 - `skill_data.md` — notes about the dataset and its handling.
 - `plan.md` / `to-do.md` / [`bom.md`](bom.md) — roadmap, task breakdown, and minimal hardware BOM.
+
+## Web UI (first version)
+
+A dependency-free local dashboard shows the current alarm surface over the
+bundled telemetry:
+
+```bash
+python scripts/web_ui.py --data data/starter
+```
+
+Open <http://127.0.0.1:8000>. Use `--host 0.0.0.0` to expose it on the local
+network (the prototype has no authentication, so trusted LANs only).
+
+The first version includes:
+
+- asset list with `OK` / `WATCH` / `ALARM` / `IDLE` status,
+- latest values and robust modified z-scores per channel,
+- top deviating channels at the selected sample,
+- a channel chart with alarm bands, window selector, and replay controls.
+
+> If `data/starter/telemetry.csv.gz` is missing from the checkout (it is
+> excluded by `.gitignore`), point `--data` at the original participant
+> bundle or provision the file first. The dashboard uses the same robust
+> envelope math as `scripts/sanity_gate.py`; SmolLM narration is not wired yet.
 
 ## Tech Stack
 
