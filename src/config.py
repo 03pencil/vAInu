@@ -7,20 +7,21 @@ from pathlib import Path
 
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config.toml")
 
-<<<<<<< Updated upstream
-=======
+# Chart-window choices in seconds; the UI scales them to the data grid.
+DEFAULT_WINDOW_INTERVALS = (10, 60, 600, 1800, 3600)
+
 _WEB_UI_DEFAULTS = {
     "host": "127.0.0.1",
     "port": 8000,
     "refresh_seconds": 2,
-    "history_samples": 240,
+    "history_samples": 600,
+    "window_intervals": list(DEFAULT_WINDOW_INTERVALS),
     "watch_fraction": 0.5,
     "default_channel": "vibration_rms_mm_s",
     "alarm_mark": 80.0,
     "cache_dir": "cache/web_ui",
 }
 
->>>>>>> Stashed changes
 
 def load_config(path: str = CONFIG_FILE) -> dict:
     """Load and return the project configuration as a dict."""
@@ -99,9 +100,6 @@ def get_asset_ids(cfg: dict | None = None) -> list[str]:
 def get_tiers(cfg: dict | None = None) -> list[str]:
     if cfg is None:
         cfg = load_config()
-<<<<<<< Updated upstream
-    return cfg.get("paths", {}).get("tiers", ["full", "starter"])
-=======
     return cfg.get("paths", {}).get("tiers", ["full", "starter"])
 
 
@@ -137,4 +135,3 @@ def get_cache_dir(cfg: dict | None = None) -> Path:
     if not path.is_absolute():
         path = Path(CONFIG_FILE).parent / path
     return path
->>>>>>> Stashed changes
