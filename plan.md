@@ -96,14 +96,14 @@ Minimal hardware only — see [`bom.md`](bom.md). Key notions:
 3. Feature engineering: rolling stats, vibration trends, pressure/flow ratios. — rolling robust z done; physics residuals / ratios pending (Layer 1)
 4. Model: train a lightweight anomaly/fault detector on benign windows; validate on events. — robust envelope validated (20/20 events); learned detector pending
 5. Shrink to smoll for edge deployment (GGUF via llama.cpp) running on UNO Q MPU. — applies to SmolLM itself; detector stays plain Python (see M5 in to-do)
-6. Deploy: App Lab app on UNO Q; MCU receives sensor data from logic box, MPU runs inference, outputs analysed data.
+6. Deploy: App Lab app on UNO Q; MCU receives sensor data from logic box, MPU runs inference, outputs analysed data. — **pilot replay path done** (`src/pilot.py`, `scripts/pilot_run.py`, pilot panel in the web UI); UART and board test pending (`arduino_uno_q_install.md` section 7).
 7. Test on hardware; iterate.
 
 ## Milestones
 
 - M1: Data exploration notebook/script done. — **done**
 - M2: Baseline model metrics on validation. — baseline KPIs recorded (lead time + FAR)
-- M3: App Lab app running on UNO Q (receive -> infer -> output).
+- M3: App Lab app running on UNO Q (receive -> infer -> output). — **in progress**: replay pilot runs on the host; board bench test next.
 - M4: End-to-end demo: pumps -> logic box -> UNO Q -> minimal web UI.
 
 ## Prediction architecture (three layers)
@@ -148,7 +148,7 @@ smollm2:135m -> mistral -> gemma4:e2b).
    - strainer dP signal: suction pressure deviation
    - thermal rise with first-order lag (bearing/winding tau from
      simulation_assumptions.md)
-3. Trend extrapolation -> time-to-limit (long-scale prediction): fit
+3. Trend extrapolation -> time-to-limit (long-scale prediction; implemented in `src/trend.py`): fit
    drift over trailing 6-24 h, solve crossing of alarm/trip limits,
    output tz + uncertainty band -> "vibration hits alarm in ~38 h".
 4. Fault-type likelihood vector from evidence signatures

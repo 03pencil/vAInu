@@ -5,7 +5,8 @@
 
 ## M1: Data exploration
 - [x] Working implementations: `data_input`, `math`, `main` done;
-  `ui.py` still a stub (matplotlib plots pending, see M2).
+  `src/ui.py` is still a matplotlib stub (unused; the dashboard is
+  `src/web_ui.py`).
 - [x] Set up Python environment / install pandas, matplotlib.
 - [x] Load telemetry from the configured tier (full/starter) into a DataFrame.
 - [x] Inspect channel names and data types.
@@ -16,11 +17,11 @@
   facts land there and in `main.py` output).
 - [x] Confirm all settings come from `config.toml` — no hard-coding.
 
-### Build order (next steps)
-1. Physics residuals (pump-curve features) — expected to lift the
-   weak detections (cavitation leads are ~0.0 h today).
-2. Trend extrapolation -> time-to-alarm (long-scale prediction).
-3. FAR reduction toward < 2% (debounce/state machine).
+### Build order (next steps, updated 2026-11-07)
+1. FAR reduction toward < 2% (debounce is in; richer features next).
+2. Mahalanobis score + logistic fault classifier (Layer 2).
+3. Pilot monitor: rolling-envelope fallback so every asset gets scored.
+4. Bench test on the UNO Q (install manual section 7).
 
 ### Findings (2026-11-07)
 - [x] Record the data blocker in `plan.md`: `data/full` is missing the
@@ -95,8 +96,10 @@
   KPIs unchanged (already saturated) but residuals now give the
   interpretable, curve-consistent evidence the fault-type vector and
   the SmolLM report need.
-- [ ] Trend extrapolation: trailing 6-24 h drift fit -> time-to-alarm /
-  time-to-trip (long-scale prediction) with uncertainty band.
+- [x] Trend extrapolation: trailing 6-24 h drift fit -> time-to-alarm /
+  time-to-trip with uncertainty band (`src/trend.py`,
+  `scripts/trend_forecast.py`, tests pass). Not yet part of the sanity-gate
+  KPIs.
 - [ ] Fault-type likelihood vector from evidence-channel signatures.
 
 ### Baseline KPI numbers (starter tier, 2026-11-07)
@@ -146,9 +149,19 @@ Recorded so later layers can be compared against them:
 - [ ] Pilot monitor: rolling-envelope fallback for assets with no clean
   envelope (PUMP-03/04/08 report `unknown` today).
 - [ ] Pilot monitor: physics channels and trend time-to-limit.
-- [ ] Serve pilot state in the web UI (`src/web_ui.py`) from `pilot/state.json`.
-- [x] First local web UI prototype (`scripts/web_ui.py`): asset status,
-  latest values, top deviations, channel chart, replay; stdlib server only.
+- [x] Serve pilot state in the web UI: `/api/pilot` route and pilot panel
+  in `src/web_ui.py`, reading `pilot/state.json`.
+- [x] `requirements.txt` with pinned pandas / numpy / scipy (runtime).
+- [x] Proofread `arduino_uno_q_install.md`; added section 7 (pilot test on
+  the board).
+- [ ] Bench test on the UNO Q per `arduino_uno_q_install.md` section 7
+  (Python 3.11+ check, copy project + telemetry, venv, tests, pilot, LAN
+  dashboard). Record wall time, RAM, errors.
+- [ ] Decide the SmolLM tag for the UNO Q: manual installs `smollm2:1.7b`,
+  `plan.md` / `skill_data.md` name `smollm2:135m`.
+- [x] First local web UI prototype (`scripts/web_ui.py`, `src/web_ui.py`):
+  asset status, latest values, top deviations, channel chart, replay;
+  stdlib server only.
 - [ ] Create App Lab app skeleton.
 - [ ] Implement MCU receiver for sensor data from logic box.
 - [ ] Wire MPU to run inference on received data.

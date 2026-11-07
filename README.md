@@ -38,12 +38,17 @@ See [`plan.md`](plan.md) for the full architecture and roadmap, and [`to-do.md`]
   - `labels.py` — aligns event / benign-window labels onto telemetry rows.
   - `math.py` — robust statistics, modified z-scores, group-aware rolling helpers.
   - `physics.py` — pump-curve, flow, efficiency and thermal residual features.
-  - `web_ui.py` — first-version local dashboard (stdlib HTTP server + JSON API).
+  - `web_ui.py` — first-version local dashboard (stdlib HTTP server + JSON API, pilot panel).
+  - `feed.py` — telemetry sources: replay (now) and UART frame parser (stub for the logic box).
+  - `pilot.py` — streaming, causal pilot monitor; writes `pilot/state.json`.
   - `ui.py` — matplotlib plotting helpers.
   - `config.py` — reads `config.toml`.
 - `scripts/` — runnable pipelines:
   - `sanity_gate.py` — baseline KPI gate: benign false-alarm rate + early-warning lead time vs the benchmark's own detection clock.
   - `web_ui.py` — serves the local dashboard (asset status, latest values, channel chart, replay).
+  - `pilot_run.py` — replays telemetry through the pilot monitor and writes `pilot/state.json` and `pilot/predictions.jsonl`.
+- `requirements.txt` — pinned runtime dependencies (pandas, numpy, scipy).
+- `arduino_uno_q_install.md` — UNO Q setup, Ollama/SmolLM install, and the board pilot test (section 7).
 - `tests/` — plain-assert test scripts (run with `.venv/bin/python tests/test_*.py`).
 - `data/` — pump telemetry dataset (`full/` + `starter/`). **Read-only**; the only data source.
 - `skills/` — coding and data guidelines for humans and LLMs.
